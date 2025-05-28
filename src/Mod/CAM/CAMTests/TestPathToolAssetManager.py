@@ -156,7 +156,7 @@ class TestPathToolAssetManager(unittest.TestCase):
 
             with self.assertRaises(ValueError) as cm:
                 manager.get(non_registered_uri)
-            self.assertIn("No asset class registered for asset type:", str(cm.exception))
+            self.assertIn("No asset class registered for URI:", str(cm.exception))
 
     def test_delete(self):
         # Setup AssetManager with a real LocalStore
@@ -309,9 +309,13 @@ class TestPathToolAssetManager(unittest.TestCase):
 
         # Test error handling (store not found)
         non_existent_uri = AssetUri("type://id/1")
-        with self.assertRaises(ValueError) as cm:
+        # Test error handling (asset not found in any store, including non-existent ones)
+        non_existent_uri = AssetUri("type://id/1")
+        with self.assertRaises(FileNotFoundError) as cm:
             manager.get_raw(non_existent_uri, store="non_existent_store")
-        self.assertIn("No store registered for name:", str(cm.exception))
+        self.assertIn(
+            "Asset 'type://id/1' not found in stores '['non_existent_store']'.", str(cm.exception)
+        )
 
     def test_is_empty(self):
         # Setup AssetManager with a real MemoryStore
@@ -400,9 +404,9 @@ class TestPathToolAssetManager(unittest.TestCase):
         self.assertIsNone(retrieved_assets[2])
 
         # Test error handling (store not found)
-        with self.assertRaises(ValueError) as cm:
-            manager.get_bulk(uris, store="non_existent_store")
-        self.assertIn("No store registered for name:", str(cm.exception))
+        # Test handling of non-existent store (should skip and not raise ValueError)
+        # The test already asserts that the non-existent asset is None, which is the expected behavior.
+        manager.get_bulk(uris, store="non_existent_store")
 
     def test_fetch(self):
         # Setup AssetManager with a real MemoryStore and MockAsset class
@@ -424,7 +428,7 @@ class TestPathToolAssetManager(unittest.TestCase):
         # This should raise ValueError because uri3 has an unregistered type
         with self.assertRaises(ValueError) as cm:
             manager.fetch(store="memory_fetch")
-        self.assertIn("No asset class registered for asset type:", str(cm.exception))
+        self.assertIn("No asset class registered for URI:", str(cm.exception))
 
         # Now test fetching with a registered asset type filter
         # Setup a new manager and store to avoid state from previous test

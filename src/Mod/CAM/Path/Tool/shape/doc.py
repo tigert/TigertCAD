@@ -21,6 +21,7 @@
 # ***************************************************************************
 
 import FreeCAD
+import Path
 import Path.Base.Util as PathUtil
 from typing import Dict, List, Any, Optional
 import tempfile
@@ -54,8 +55,20 @@ def find_shape_object(doc: "FreeCAD.Document") -> Optional["FreeCAD.DocumentObje
     return doc.Objects[0] if doc.Objects else None
 
 
+def get_unset_value_for(attribute_type: str):
+    if attribute_type == "App::PropertyLength":
+        return FreeCAD.Units.Quantity(0)
+    elif attribute_type == "App::PropertyString":
+        return ""
+    elif attribute_type == "App::PropertyInteger":
+        return 0
+    return None
+
+
 def get_object_properties(
-    obj: "FreeCAD.DocumentObject", expected_params: List[str]
+    obj: "FreeCAD.DocumentObject",
+    props: List[str] | None = None,
+    group: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Extract properties matching expected_params from a FreeCAD PropertyBag.
@@ -71,14 +84,16 @@ def get_object_properties(
                         Values are FreeCAD native types.
     """
     properties = {}
-    for name in expected_params:
+    for name in props or obj.PropertiesList:
+        if group and not obj.getGroupOfProperty(name) == group:
+            continue
         if hasattr(obj, name):
             properties[name] = getattr(obj, name)
         else:
             # Log a warning if a parameter expected by the shape class is missing
-            FreeCAD.Console.PrintWarning(
+            Path.Log.debug(
                 f"Parameter '{name}' not found on object '{obj.Label}' "
-                f"({obj.Name}). Default value will be used by the shape class.\n"
+                f"({obj.Name}). Default value will be used by the shape class."
             )
             properties[name] = None  # Indicate missing value
     return properties
@@ -99,13 +114,13 @@ def update_shape_object_properties(
             try:
                 PathUtil.setProperty(obj, name, value)
             except Exception as e:
-                FreeCAD.Console.PrintWarning(
+                Path.Log.warning(
                     f"Failed to set property '{name}' on object '{obj.Label}'"
-                    f" ({obj.Name}) with value '{value}': {e}\n"
+                    f" ({obj.Name}) with value '{value}': {e}"
                 )
         else:
-            FreeCAD.Console.PrintWarning(
-                f"Property '{name}' not found on object '{obj.Label}'" f" ({obj.Name}). Skipping.\n"
+            Path.Log.warning(
+                f"Property '{name}' not found on object '{obj.Label}' ({obj.Name}). Skipping."
             )
 
 
@@ -184,6 +199,4 @@ class ShapeDocFromBytes:
             try:
                 os.remove(self._temp_file)
             except Exception as e:
-                FreeCAD.Console.PrintWarning(
-                    f"Failed to remove temporary file {self._temp_file}: {e}\n"
-                )
+                Path.Log.warning(f"Failed to remove temporary file {self._temp_file}: {e}")

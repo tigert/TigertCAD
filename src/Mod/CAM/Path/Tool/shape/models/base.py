@@ -34,6 +34,7 @@ from ...camassets import cam_assets
 from ..doc import (
     find_shape_object,
     get_object_properties,
+    get_unset_value_for,
     update_shape_object_properties,
     ShapeDocFromBytes,
 )
@@ -126,6 +127,68 @@ class ToolBitShape(Asset):
                 f"No ToolBitShape subclass found matching Body label '{body_obj.Label}' in {doc}"
             )
         return shape_class
+
+    @classmethod
+    def get_shape_class_from_id(
+        cls,
+        shape_id: str,
+        shape_type: str | None = None,
+        default: Type["ToolBitShape"] = None,
+    ) -> Type["ToolBitShape"]:
+        """
+        Extracts the shape class from the given ID and shape_type, retrieving it
+        from the asset manager if necessary.
+        """
+        # Best method: if the shape-type is specified, use that.
+        if shape_type:
+            return cls.get_subclass_by_name(shape_type)
+
+        # If no shape type is specified, try to find the shape class from the ID.
+        shape_class = cls.get_subclass_by_name(shape_id)
+        if shape_class:
+            return shape_class
+
+        # If that also fails, try to load the shape to get the class.
+        Path.Log.debug(
+            f'Failed to infer shape type from "{shape_id}", trying to load'
+            f' the shape "{shape_id}" to determine the class. This may'
+            " negatively impact performance."
+        )
+        shape_asset_uri = ToolBitShape.resolve_name(shape_id)
+        data = cam_assets.get_raw(shape_asset_uri)
+        if data:
+            try:
+                shape_class = ToolBitShape.get_shape_class_from_bytes(data)
+            except ValueError:
+                pass
+            else:
+                return shape_class
+
+        # Otherwise use the default, if we have one.
+        shape_types = [c.name for c in ToolBitShape.__subclasses__()]
+        if default is not None:
+            Path.Log.warning(
+                f'Failed to infer shape type from {shape_id}, using "{default.name}".'
+                f" To fix, name the body in the shape file to one of: {shape_types}"
+            )
+            return default
+
+        # If all else fails, try to guess the shape class from the ID.
+        shape_class = ToolBitShape.guess_subclass_from_name(shape_id)
+        if shape_class:
+            Path.Log.warning(
+                f'Failed to infer shape type from "{shape_id}",'
+                f' guessing "{shape_class.name}".'
+                f" To fix, name the body in the shape file to one of: {shape_types}"
+            )
+            return shape_class
+
+        # Default to endmill if nothing else works
+        Path.Log.warning(
+            f"Failed to infer shape type from {shape_id}."
+            f" To fix, name the body in the shape file to one of: {shape_types}"
+        )
+        return None
 
     @classmethod
     def get_shape_class_from_bytes(cls, data: bytes) -> Type["ToolBitShape"]:
@@ -287,7 +350,7 @@ class ToolBitShape(Asset):
             try:
                 shape_class = ToolBitShape.get_shape_class_from_bytes(data)
             except Exception as e:
-                Path.Log.warning(f"{id}: Failed to determine shape class from bytes: {e}")
+                Path.Log.debug(f"{id}: Failed to determine shape class from bytes: {e}")
                 shape_types = [c.name for c in ToolBitShape.__subclasses__()]
                 shape_class = ToolBitShape.guess_subclass_from_name(id)
                 if shape_class:
@@ -310,33 +373,34 @@ class ToolBitShape(Asset):
             props_obj = ToolBitShape._find_property_object(temp_doc)
             if not props_obj:
                 raise ValueError("No 'Attributes' PropertyBag object found in document bytes")
-
-            # Get properties from the properties object
-            expected_params = shape_class.get_expected_shape_parameters()
-            loaded_params = get_object_properties(props_obj, expected_params)
-
-            missing_params = [
-                name
-                for name in expected_params
-                if name not in loaded_params or loaded_params[name] is None
-            ]
+            loaded_params = get_object_properties(props_obj, group="Shape")
 
             # For now, we log missing parameters, but do not raise an error.
             # This allows for more flexible shape files that may not have all
             # parameters set, while still warning the user.
             # In the future, we may want to raise an error if critical parameters
             # are missing.
+            expected_params = shape_class.get_expected_shape_parameters()
+            missing_params = [
+                name
+                for name in expected_params
+                if name not in loaded_params or loaded_params[name] is None
+            ]
             if missing_params:
                 Path.Log.error(
                     f"Validation error: Object '{props_obj.Label}' in document {id} "
                     f"is missing parameters for {shape_class.__name__}: {', '.join(missing_params)}."
                     f" In future releases, these shapes will not load!"
                 )
+                for param in missing_params:
+                    param_type = shape_class.get_parameter_property_type(param)
+                    loaded_params[param] = get_unset_value_for(param_type)
 
             # Instantiate the specific subclass with the provided ID
             instance = shape_class(id=id)
-            instance._data = data  # Cache the byte content
+            instance._data = data  # Keep the byte content
             instance._defaults = loaded_params
+            instance._params = instance._defaults | instance._params
 
             if dependencies:  # dependencies is None = shallow load
                 # Assign resolved dependencies (like the icon) to the instance
@@ -352,10 +416,6 @@ class ToolBitShape(Asset):
                         asset_id=id + ".png",
                     )
                     instance.icon = cast(ToolBitShapeIcon, dependencies.get(icon_uri))
-
-            # Update instance parameters, prioritizing loaded defaults but not
-            # overwriting parameters that may already be set during __init__
-            instance._params = instance._defaults | instance._params
 
             return instance
 
@@ -522,11 +582,12 @@ class ToolBitShape(Asset):
         entry = self.schema().get(param_name)
         return entry[0] if entry else str_param_name
 
-    def get_parameter_property_type(self, param_name: str) -> str:
+    @classmethod
+    def get_parameter_property_type(cls, param_name: str) -> str:
         """
         Get the FreeCAD property type string for a given parameter name.
         """
-        return self.schema()[param_name][1]
+        return cls.schema()[param_name][1]
 
     def get_parameters(self) -> Dict[str, Any]:
         """
