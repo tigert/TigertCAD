@@ -343,7 +343,7 @@ class CAMWorkbench(Workbench):
                     # self.appendContextMenu("", ["Set_StartPoint"])
                     # self.appendContextMenu("", ["Set_EndPoint"])
                     for cmd in self.dressupcmds:
-                        self.appendContextMenu("", [cmd])
+                        self.appendContextMenu("Dressup", [cmd])
                     menuAppended = True
             if isinstance(obj.Proxy, Path.Tool.ToolBit):
                 self.appendContextMenu("", ["CAM_ToolBitSave", "CAM_ToolBitSaveAs"])
