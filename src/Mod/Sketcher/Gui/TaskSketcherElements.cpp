@@ -97,7 +97,7 @@ QT_TRANSLATE_NOOP("SketcherGui::ElementView", "Radius or Diameter Dimension");
 
 QT_TRANSLATE_NOOP("SketcherGui::ElementView", "Angle Dimension");
 
-QT_TRANSLATE_NOOP("SketcherGui::ElementView", "Construction Geometry");
+QT_TRANSLATE_NOOP("SketcherGui::ElementView", "Toggle Construction Geometry");
 
 QT_TRANSLATE_NOOP("SketcherGui::ElementView", "Select Constraints");
 
@@ -1735,6 +1735,11 @@ void TaskSketcherElements::onListWidgetElementsItemPressed(QListWidgetItem* it)
         previouslySelectedItemIndex = focusItemIndex;
 
     ui->listWidgetElements->repaint();
+
+    // it seems that addSelections gives back the focus to the view, and not immediately.
+    QTimer::singleShot(200, [this]() {
+        ui->listWidgetElements->setFocus();
+    });
 }
 
 bool TaskSketcherElements::hasInputWidgetFocused()
