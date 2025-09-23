@@ -775,7 +775,8 @@ void ViewProviderAssembly::collectMovableObjects(App::DocumentObject* selRoot,
     if (onlySolids
         && !(currentObject->isDerivedFrom<App::Part>()
              || currentObject->isDerivedFrom<Part::Feature>()
-             || currentObject->isDerivedFrom<App::Link>())) {
+             || currentObject->isDerivedFrom<App::Link>()
+             || currentObject->isDerivedFrom<App::LinkElement>())) {
         return;
     }
 
@@ -793,6 +794,9 @@ ViewProviderAssembly::DragMode ViewProviderAssembly::findDragMode()
 {
     auto addPartsToMove = [&](const std::vector<Assembly::ObjRef>& refs) {
         for (auto& partRef : refs) {
+            if (!partRef.obj) {
+                continue;
+            }
             auto* pPlc =
                 dynamic_cast<App::PropertyPlacement*>(partRef.obj->getPropertyByName("Placement"));
             if (pPlc) {
