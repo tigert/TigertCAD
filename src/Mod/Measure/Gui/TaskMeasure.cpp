@@ -590,6 +590,11 @@ bool TaskMeasure::reject()
     return false;
 }
 
+void TaskMeasure::closed()
+{
+    reject();
+}
+
 void TaskMeasure::reset()
 {
     // Reset tool state

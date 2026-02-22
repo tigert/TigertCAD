@@ -67,6 +67,7 @@ public:
     bool apply(bool reset);
     bool reject() override;
     void reset();
+    void closed() override;
 
     bool hasSelection();
     void clearSelection();
