@@ -150,7 +150,7 @@ class CAMWorkbench(Workbench):
         ]
         threedopcmdlist = ["CAM_Pocket3D"]
         engravecmdlist = ["CAM_Engrave", "CAM_Deburr", "CAM_Vcarve"]
-        drillingcmdlist = ["CAM_Drilling", "CAM_Tapping"]
+        drillingcmdlist = ["CAM_Drilling", "CAM_Tapping", "CAM_ThreadMilling"]
         modcmdlist = ["CAM_OperationCopy", "CAM_Array", "CAM_SimpleCopy"]
         dressupcmdlist = [
             "CAM_DressupArray",
@@ -217,7 +217,6 @@ class CAMWorkbench(Workbench):
         if Path.Preferences.experimentalFeaturesEnabled():
             prepcmdlist.append("CAM_PathShapeTC")
             extracmdlist.extend(["CAM_Area", "CAM_Area_Workplane"])
-            specialcmdlist.append("CAM_ThreadMilling")
             twodopcmdlist.append("CAM_Slot")
 
         if Path.Preferences.advancedOCLFeaturesEnabled():
