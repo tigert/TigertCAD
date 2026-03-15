@@ -405,6 +405,20 @@ class PostProcessor:
                 "help": translate("CAM", "G-code commands inserted after tool changes."),
             },
             {
+                "name": "pre_rotary_move",
+                "type": "text",
+                "label": translate("CAM", "Pre-Rotary Move"),
+                "default": "",
+                "help": translate("CAM", "G-code commands inserted before rotary axis moves."),
+            },
+            {
+                "name": "post_rotary_move",
+                "type": "text",
+                "label": translate("CAM", "Post-Rotary Move"),
+                "default": "",
+                "help": translate("CAM", "G-code commands inserted after rotary axis moves."),
+            },
+            {
                 "name": "show_dialog",
                 "type": "bool",
                 "label": translate("CAM", "Show Pre-processing Dialogs"),
