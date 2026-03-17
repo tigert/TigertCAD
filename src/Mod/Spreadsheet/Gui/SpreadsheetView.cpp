@@ -135,16 +135,10 @@ SheetView::SheetView(Gui::Document* pcDocument, App::DocumentObject* docObj, QWi
     QList<QtColorPicker*> bgList = Gui::getMainWindow()->findChildren<QtColorPicker*>(
         QStringLiteral("Spreadsheet_BackgroundColor")
     );
-    if (!bgList.empty()) {
-        bgList[0]->setCurrentColor(palette.color(QPalette::Base));
-    }
 
     QList<QtColorPicker*> fgList = Gui::getMainWindow()->findChildren<QtColorPicker*>(
         QStringLiteral("Spreadsheet_ForegroundColor")
     );
-    if (!fgList.empty()) {
-        fgList[0]->setCurrentColor(palette.color(QPalette::Text));
-    }
 
     // Set document object to create auto completer
     ui->cellContent->setDocumentObject(sheet);
