@@ -995,7 +995,6 @@ ViewProviderAssembly::DragMode ViewProviderAssembly::findDragMode()
         if (!ref) {
             return DragMode::Translation;
         }
-        auto* obj = getObjFromJointRef(movingJoint, pName.c_str());
         Base::Placement asmPlc = App::GeoFeature::getGlobalPlacement(getObject<AssemblyObject>());
         Base::Placement global_plc = asmPlc * App::GeoFeature::getGlobalPlacement(nullptr, ref);
         jcsGlobalPlc = global_plc * jcsPlc;
@@ -1810,9 +1809,7 @@ void ViewProviderAssembly::UpdateSolverInformation()
     auto* assembly = getObject<AssemblyObject>();
 
     int dofs = assembly->getLastDoF();
-    bool hasConflicts = assembly->getLastHasConflicts();
     bool hasRedundancies = assembly->getLastHasRedundancies();
-    bool hasPartiallyRedundant = assembly->getLastHasPartialRedundancies();
     bool hasMalformed = assembly->getLastHasMalformedConstraints();
 
     if (assembly->isEmpty()) {
