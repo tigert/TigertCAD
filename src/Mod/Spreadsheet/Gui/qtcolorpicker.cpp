@@ -610,6 +610,118 @@ ColorPickerPopup::ColorPickerPopup(int width, bool withColorDialog,
 
 /*! \internal
 
+    Destructs the popup widget.
+*/
+ColorPickerPopup::~ColorPickerPopup()
+{
+    if (eventLoop)
+        eventLoop->exit();
+}
+
+/*! \internal
+
+    Adds \a item to the grid. The items are added from top-left to
+    bottom-right.
+*/
+void ColorPickerPopup::insertColor(const QColor & col, const QString & text, int index)
+{
+    grid->insertColor(col, text, index);
+}
+
+/*! \internal
+
+*/
+void ColorPickerPopup::exec()
+{
+    grid->show();
+
+    QEventLoop e;
+    eventLoop = &e;
+    (void) e.exec();
+    eventLoop = nullptr;
+}
+
+QColor ColorPickerPopup::lastSelected() const
+{
+    return grid->lastSelected();
+}
+
+/*! \internal
+
+    If there is an item whole color is equal to \a col, returns a
+    pointer to this item; otherwise returns 0.
+*/
+ColorPickerItem * ColorPickerPopup::find(const QColor & col) const
+{
+    return grid->find(col);
+}
+
+/*! \internal
+
+    Returns the color at \a index in the grid.
+*/
+QColor ColorPickerPopup::color(int index) const
+{
+    return grid->color(index);
+}
+
+void ColorPickerPopup::setLastSel(const QColor & col)
+{
+    grid->setLastSel(col);
+}
+
+/*! \internal
+
+    Copies the color dialog's currently selected item and emits
+    selected().
+*/
+void ColorPickerPopup::getColorFromDialog()
+{
+    //bool ok;
+    //QRgb rgb = QColorDialog::getRgba(lastSel.rgba(), &ok, parentWidget());
+    QColor col;
+    if (Gui::DialogOptions::dontUseNativeColorDialog()){
+        col = QColorDialog::getColor(grid->lastSelected(), parentWidget(), QString(),
+            QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
+    } else {
+        col = QColorDialog::getColor(grid->lastSelected(), parentWidget(), QString(),
+            QColorDialog::ShowAlphaChannel);
+    }
+    if (!col.isValid())
+    return;
+
+    //QColor col = QColor::fromRgba(rgb);
+    insertColor(col, tr("Custom Color"), -1);
+    grid->setLastSel(col);
+    Q_EMIT selected(col);
+}
+
+/*! \internal
+
+    Sets focus on the popup to enable keyboard navigation. Draws
+    focusRect and selection rect.
+*/
+void ColorPickerPopup::showEvent(QShowEvent *)
+{
+    grid->setFocus();
+}
+
+/*! \internal
+
+*/
+void ColorPickerPopup::hideEvent(QHideEvent *e)
+{
+    if (eventLoop)
+        eventLoop->exit();
+
+    setFocus();
+
+    Q_EMIT hid();
+    QFrame::hideEvent(e);
+}
+
+/*! \internal
+
     Constructs the color grid widget.
 */
 ColorPickerGrid::ColorPickerGrid(int width, QWidget *parent)
@@ -628,54 +740,9 @@ ColorPickerGrid::ColorPickerGrid(int width, QWidget *parent)
 
     Destructs the popup widget.
 */
-ColorPickerPopup::~ColorPickerPopup()
-{
-    if (eventLoop)
-        eventLoop->exit();
-}
-
-/*! \internal
-
-    Destructs the popup widget.
-*/
 ColorPickerGrid::~ColorPickerGrid()
 {
 
-}
-
-/*! \internal
-
-    If there is an item whole color is equal to \a col, returns a
-    pointer to this item; otherwise returns 0.
-*/
-ColorPickerItem * ColorPickerPopup::find(const QColor & col) const
-{
-    return grid->find(col);
-}
-
-/*! \internal
-
-    If there is an item whole color is equal to \a col, returns a
-    pointer to this item; otherwise returns 0.
-*/
-ColorPickerItem *ColorPickerGrid::find(const QColor &col) const
-{
-    for (int i = 0; i < items.size(); ++i) {
-    if (items.at(i) && items.at(i)->color() == col)
-        return items.at(i);
-    }
-
-    return nullptr;
-}
-
-/*! \internal
-
-    Adds \a item to the grid. The items are added from top-left to
-    bottom-right.
-*/
-void ColorPickerPopup::insertColor(const QColor & col, const QString & text, int index)
-{
-    grid->insertColor(col, text, index);
 }
 
 /*! \internal
@@ -721,11 +788,25 @@ void ColorPickerGrid::insertColor(const QColor &col, const QString &text, int in
 
 /*! \internal
 
-    Returns the color at \a index in the grid.
 */
-QColor ColorPickerPopup::color(int index) const
+QColor ColorPickerGrid::lastSelected() const
 {
-    return grid->color(index);
+    return lastSel;
+}
+
+/*! \internal
+
+    If there is an item whole color is equal to \a col, returns a
+    pointer to this item; otherwise returns 0.
+*/
+ColorPickerItem *ColorPickerGrid::find(const QColor &col) const
+{
+    for (int i = 0; i < items.size(); ++i) {
+    if (items.at(i) && items.at(i)->color() == col)
+        return items.at(i);
+    }
+
+    return nullptr;
 }
 
 /*! \internal
@@ -740,18 +821,7 @@ QColor ColorPickerGrid::color(int index) const
     return that->items.at(index)->color();
 }
 
-/*! \internal
-
-*/
-void ColorPickerPopup::exec()
-{
-    grid->show();
-
-    QEventLoop e;
-    eventLoop = &e;
-    (void) e.exec();
-    eventLoop = nullptr;
-}
+void ColorPickerGrid::setLastSel(const QColor & col) { lastSel = col; }
 
 /*! \internal
 
@@ -881,43 +951,6 @@ void ColorPickerGrid::keyPressEvent(QKeyEvent *e)
 
 /*! \internal
 
-*/
-void ColorPickerPopup::hideEvent(QHideEvent *e)
-{
-    if (eventLoop)
-        eventLoop->exit();
-
-    setFocus();
-
-    Q_EMIT hid();
-    QFrame::hideEvent(e);
-}
-
-QColor ColorPickerPopup::lastSelected() const
-{
-    return grid->lastSelected();
-}
-
-/*! \internal
-
-*/
-QColor ColorPickerGrid::lastSelected() const
-{
-    return lastSel;
-}
-
-/*! \internal
-
-    Sets focus on the popup to enable keyboard navigation. Draws
-    focusRect and selection rect.
-*/
-void ColorPickerPopup::showEvent(QShowEvent *)
-{
-    grid->setFocus();
-}
-
-/*! \internal
-
     Sets the focus to the selected item in the grid.
 */
 void ColorPickerGrid::focusInEvent(QFocusEvent *e)
@@ -979,39 +1012,6 @@ void ColorPickerGrid::regenerateGrid()
 
     updateGeometry();
 }
-
-/*! \internal
-
-    Copies the color dialog's currently selected item and emits
-    selected().
-*/
-void ColorPickerPopup::getColorFromDialog()
-{
-    //bool ok;
-    //QRgb rgb = QColorDialog::getRgba(lastSel.rgba(), &ok, parentWidget());
-    QColor col;
-    if (Gui::DialogOptions::dontUseNativeColorDialog()){
-        col = QColorDialog::getColor(grid->lastSelected(), parentWidget(), QString(),
-            QColorDialog::ShowAlphaChannel | QColorDialog::DontUseNativeDialog);
-    } else {
-        col = QColorDialog::getColor(grid->lastSelected(), parentWidget(), QString(),
-            QColorDialog::ShowAlphaChannel);
-    }
-    if (!col.isValid())
-    return;
-
-    //QColor col = QColor::fromRgba(rgb);
-    insertColor(col, tr("Custom Color"), -1);
-    grid->setLastSel(col);
-    Q_EMIT selected(col);
-}
-
-void ColorPickerPopup::setLastSel(const QColor & col)
-{
-    grid->setLastSel(col);
-}
-
-void ColorPickerGrid::setLastSel(const QColor & col) { lastSel = col; }
 
 /*!
     Constructs a ColorPickerItem whose color is set to \a color, and
