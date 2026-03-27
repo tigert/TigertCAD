@@ -151,7 +151,6 @@ void WorkbenchHelper::setForegroundColor(const QColor& color)
             Sheet* sheet = sheetView->getSheet();
             std::vector<Range> ranges = sheetView->selectedRanges();
 
-            // Execute mergeCells commands
             if (!ranges.empty()) {
                 std::vector<Range>::const_iterator i = ranges.begin();
 
@@ -186,7 +185,6 @@ void SpreadsheetGui::WorkbenchHelper::clearForegroundColor()
             Sheet* sheet = sheetView->getSheet();
             std::vector<Range> ranges = sheetView->selectedRanges();
 
-            // Execute mergeCells commands
             if (!ranges.empty()) {
                 std::vector<Range>::const_iterator i = ranges.begin();
 
@@ -218,7 +216,6 @@ void WorkbenchHelper::setBackgroundColor(const QColor& color)
             Sheet* sheet = sheetView->getSheet();
             std::vector<Range> ranges = sheetView->selectedRanges();
 
-            // Execute mergeCells commands
             if (!ranges.empty()) {
                 std::vector<Range>::const_iterator i = ranges.begin();
 
@@ -255,7 +252,6 @@ void SpreadsheetGui::WorkbenchHelper::clearBackgroundColor()
             Sheet* sheet = sheetView->getSheet();
             std::vector<Range> ranges = sheetView->selectedRanges();
 
-            // Execute mergeCells commands
             if (!ranges.empty()) {
                 std::vector<Range>::const_iterator i = ranges.begin();
 
