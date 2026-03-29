@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-FileCopyrightText: 2025 Billy Huddleston <billy@ivdc.com>
+# SPDX-FileCopyrightText: 2026 sliptonic <shopinthewoods@gmail.com>
 # SPDX-FileNotice: Part of the FreeCAD project.
 
 ################################################################################
@@ -645,11 +646,13 @@ class MachineEditorDialog(QtGui.QDialog):
                 self.machine.rotary_axes[axis_name].role = role
 
     def _on_axis_parent_changed(self, axis_name, combo, axis_type):
-        """Update axis parent relationship."""
+        """Update axis parent relationship.
+
+        BaseFrame is the implicit kinematic root.  Selecting it sets
+        parent=None which means the axis is a direct child of BaseFrame.
+        """
         if self.machine:
             parent = combo.itemData(combo.currentIndex())
-            if parent == "None":
-                parent = None
             if axis_type == "linear" and axis_name in self.machine.linear_axes:
                 self.machine.linear_axes[axis_name].parent = parent
             elif axis_type == "rotary" and axis_name in self.machine.rotary_axes:
@@ -691,20 +694,6 @@ class MachineEditorDialog(QtGui.QDialog):
                 self.machine.kinematics.dwo_supported = value
             elif field_name == "notes":
                 self.machine.kinematics.notes = value
-            elif field_name == "origin_x":
-                self.machine.kinematics.base_frame.origin[0] = value
-            elif field_name == "origin_y":
-                self.machine.kinematics.base_frame.origin[1] = value
-            elif field_name == "origin_z":
-                self.machine.kinematics.base_frame.origin[2] = value
-            elif field_name == "quat_w":
-                self.machine.kinematics.base_frame.orientation_quaternion[0] = value
-            elif field_name == "quat_x":
-                self.machine.kinematics.base_frame.orientation_quaternion[1] = value
-            elif field_name == "quat_y":
-                self.machine.kinematics.base_frame.orientation_quaternion[2] = value
-            elif field_name == "quat_z":
-                self.machine.kinematics.base_frame.orientation_quaternion[3] = value
 
     def _on_toolhead_field_changed(self, toolhead_index, field_name, value):
         """Update toolhead field in Machine object when UI field changes.
@@ -882,74 +871,22 @@ class MachineEditorDialog(QtGui.QDialog):
             self.update_axes()
 
     def _on_type_changed(self, index):
-        """Update machine type and refresh axes."""
+        """Update machine type and refresh axes.
+
+        Delegates to Machine._initialize_from_machine_type so that proper
+        kinematic parent chains, roles, and sequences are applied.
+        """
         if self.machine:
             machine_type = self.type_combo.itemData(index)
-            # Note: machine_type is a read-only property determined by axes configuration
-            # Don't try to set it directly - instead modify the axes below
 
-            # Rebuild axes in machine based on new type
-            config = self.MACHINE_TYPES.get(machine_type, {})
-
-            # Store existing axes for preservation
-            old_linear_axes = self.machine.linear_axes.copy()
-            old_rotary_axes = self.machine.rotary_axes.copy()
-
-            # Clear and rebuild linear axes
-            self.machine.linear_axes = {}
-            for axis_name in config.get("linear", []):
-                # Preserve existing axis if available
-                if axis_name in old_linear_axes:
-                    self.machine.linear_axes[axis_name] = old_linear_axes[axis_name]
-                else:
-                    # Create with enhanced multi-axis support
-                    self.machine.linear_axes[axis_name] = LinearAxis(
-                        name=axis_name,
-                        direction_vector=(
-                            FreeCAD.Vector(1, 0, 0)
-                            if axis_name == "X"
-                            else (
-                                FreeCAD.Vector(0, 1, 0)
-                                if axis_name == "Y"
-                                else FreeCAD.Vector(0, 0, 1)
-                            )
-                        ),
-                        min_limit=0,
-                        max_limit=1000,
-                        max_velocity=10000,
-                        sequence=0,
-                        role=AxisRole.TABLE_LINEAR,  # Default role
-                        parent=None,  # Default no parent
-                        joint_origin=[0, 0, 0],  # Default origin
-                    )
-
-            # Clear and rebuild rotary axes
-            self.machine.rotary_axes = {}
-            for axis_name in config.get("rotary", []):
-                # Preserve existing axis if available
-                if axis_name in old_rotary_axes:
-                    self.machine.rotary_axes[axis_name] = old_rotary_axes[axis_name]
-                else:
-                    # Create with defaults
-                    default_vector = (
-                        [1, 0, 0]
-                        if axis_name == "A"
-                        else [0, 1, 0] if axis_name == "B" else [0, 0, 1]
-                    )
-                    self.machine.rotary_axes[axis_name] = RotaryAxis(
-                        name=axis_name,
-                        rotation_vector=FreeCAD.Vector(*default_vector),
-                        min_limit=-180,
-                        max_limit=180,
-                        max_velocity=36000,
-                        sequence=0,
-                        prefer_positive=True,
-                        role=AxisRole.TABLE_ROTARY,  # Default role
-                        parent=None,  # Default no parent
-                        joint_origin=[0, 0, 0],  # Default origin
-                        solution_preference="shortest",  # Default solution
-                        allow_flip=True,  # Default allow flip
-                    )
+            if machine_type == "custom":
+                # Custom type: clear all axes; user builds from scratch
+                self.machine.linear_axes = {}
+                self.machine.rotary_axes = {}
+            else:
+                # Use the canonical initializer which sets correct parent
+                # chains, roles, and sequences for each machine topology.
+                self.machine._initialize_from_machine_type(machine_type)
 
             self.update_axes()
 
@@ -1045,79 +982,6 @@ class MachineEditorDialog(QtGui.QDialog):
         # Kinematics group
         self.kinematics_group = QtGui.QGroupBox(translate("CAM_MachineEditor", "Kinematics"))
         kinematics_layout = QtGui.QFormLayout(self.kinematics_group)
-
-        # Base frame section
-        base_frame_group = QtGui.QGroupBox(translate("CAM_MachineEditor", "Base Frame"))
-        base_frame_group.setCheckable(True)
-        base_frame_group.setChecked(True)  # Ensure it's expanded by default
-        base_frame_layout = QtGui.QGridLayout(base_frame_group)
-
-        # Origin fields
-        base_frame_layout.addWidget(QtGui.QLabel("X:"), 0, 0)
-        self.origin_x_spin = QtGui.QDoubleSpinBox()
-        self.origin_x_spin.setRange(-9999, 9999)
-        self.origin_x_spin.setDecimals(3)
-        self.origin_x_spin.valueChanged.connect(
-            lambda v: self._on_kinematics_field_changed("origin_x", v)
-        )
-        base_frame_layout.addWidget(self.origin_x_spin, 0, 1)
-
-        base_frame_layout.addWidget(QtGui.QLabel("Y:"), 0, 2)
-        self.origin_y_spin = QtGui.QDoubleSpinBox()
-        self.origin_y_spin.setRange(-9999, 9999)
-        self.origin_y_spin.setDecimals(3)
-        self.origin_y_spin.valueChanged.connect(
-            lambda v: self._on_kinematics_field_changed("origin_y", v)
-        )
-        base_frame_layout.addWidget(self.origin_y_spin, 0, 3)
-
-        base_frame_layout.addWidget(QtGui.QLabel("Z:"), 0, 4)
-        self.origin_z_spin = QtGui.QDoubleSpinBox()
-        self.origin_z_spin.setRange(-9999, 9999)
-        self.origin_z_spin.setDecimals(3)
-        self.origin_z_spin.valueChanged.connect(
-            lambda v: self._on_kinematics_field_changed("origin_z", v)
-        )
-        base_frame_layout.addWidget(self.origin_z_spin, 0, 5)
-
-        # Quaternion fields
-        base_frame_layout.addWidget(QtGui.QLabel("W:"), 1, 0)
-        self.quat_w_spin = QtGui.QDoubleSpinBox()
-        self.quat_w_spin.setRange(-1, 1)
-        self.quat_w_spin.setDecimals(3)
-        self.quat_w_spin.valueChanged.connect(
-            lambda v: self._on_kinematics_field_changed("quat_w", v)
-        )
-        base_frame_layout.addWidget(self.quat_w_spin, 1, 1)
-
-        base_frame_layout.addWidget(QtGui.QLabel("X:"), 1, 2)
-        self.quat_x_spin = QtGui.QDoubleSpinBox()
-        self.quat_x_spin.setRange(-1, 1)
-        self.quat_x_spin.setDecimals(3)
-        self.quat_x_spin.valueChanged.connect(
-            lambda v: self._on_kinematics_field_changed("quat_x", v)
-        )
-        base_frame_layout.addWidget(self.quat_x_spin, 1, 3)
-
-        base_frame_layout.addWidget(QtGui.QLabel("Y:"), 1, 4)
-        self.quat_y_spin = QtGui.QDoubleSpinBox()
-        self.quat_y_spin.setRange(-1, 1)
-        self.quat_y_spin.setDecimals(3)
-        self.quat_y_spin.valueChanged.connect(
-            lambda v: self._on_kinematics_field_changed("quat_y", v)
-        )
-        base_frame_layout.addWidget(self.quat_y_spin, 1, 5)
-
-        base_frame_layout.addWidget(QtGui.QLabel("Z:"), 1, 6)
-        self.quat_z_spin = QtGui.QDoubleSpinBox()
-        self.quat_z_spin.setRange(-1, 1)
-        self.quat_z_spin.setDecimals(3)
-        self.quat_z_spin.valueChanged.connect(
-            lambda v: self._on_kinematics_field_changed("quat_z", v)
-        )
-        base_frame_layout.addWidget(self.quat_z_spin, 1, 7)
-
-        kinematics_layout.addRow(base_frame_group)
 
         # TCP/DWO support
         self.tcp_supported_check = QtGui.QCheckBox()
@@ -1254,7 +1118,7 @@ class MachineEditorDialog(QtGui.QDialog):
 
                 # Parent dropdown
                 parent_combo = QtGui.QComboBox()
-                parent_combo.addItem("None", None)
+                parent_combo.addItem("BaseFrame", None)
                 for other_axis in all_axis_names:
                     if other_axis != axis:
                         parent_combo.addItem(other_axis, other_axis)
@@ -1432,7 +1296,7 @@ class MachineEditorDialog(QtGui.QDialog):
 
                 # Parent dropdown
                 parent_combo = QtGui.QComboBox()
-                parent_combo.addItem("None", None)
+                parent_combo.addItem("BaseFrame", None)
                 for other_axis in all_axis_names:
                     if other_axis != axis:
                         parent_combo.addItem(other_axis, other_axis)
@@ -2346,17 +2210,6 @@ class MachineEditorDialog(QtGui.QDialog):
         """Populate kinematics fields from machine object."""
         if not self.machine:
             return
-
-        # Base frame origin
-        self.origin_x_spin.setValue(self.machine.kinematics.base_frame.origin[0])
-        self.origin_y_spin.setValue(self.machine.kinematics.base_frame.origin[1])
-        self.origin_z_spin.setValue(self.machine.kinematics.base_frame.origin[2])
-
-        # Base frame quaternion
-        self.quat_w_spin.setValue(self.machine.kinematics.base_frame.orientation_quaternion[0])
-        self.quat_x_spin.setValue(self.machine.kinematics.base_frame.orientation_quaternion[1])
-        self.quat_y_spin.setValue(self.machine.kinematics.base_frame.orientation_quaternion[2])
-        self.quat_z_spin.setValue(self.machine.kinematics.base_frame.orientation_quaternion[3])
 
         # TCP/DWO support
         self.tcp_supported_check.setChecked(self.machine.kinematics.tcp_supported)
