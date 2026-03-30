@@ -564,12 +564,11 @@ class PostProcessDialog:
         tree = dlg.treeWidgetOperations
         tree.blockSignals(True)
         tree.clear()
+        tree.setHeaderHidden(True)
 
         for op in self._get_active_operations():
             item = QtGui.QTreeWidgetItem(tree)
             item.setText(0, op.Label)
-            ct = getattr(op, "CycleTime", None)
-            item.setText(1, ct if ct else "-")
             item.setCheckState(0, QtCore.Qt.CheckState.Checked)
             item.setFlags(
                 item.flags()
@@ -578,10 +577,8 @@ class PostProcessDialog:
             )
 
         tree.resizeColumnToContents(0)
-        tree.header().setStretchLastSection(True)
         tree.blockSignals(False)
         self._update_ops_tab_label()
-        self._update_total_time()
 
     def _get_dialog_overrides(self):
         """Collect current dialog widget values as an overrides dict.
@@ -715,27 +712,8 @@ class PostProcessDialog:
         """Return only active operations, matching what the tree widget displays."""
         return [op for op in self._get_operations() if getattr(op, "Active", True)]
 
-    def _update_total_time(self):
-        tree = self.dialog.treeWidgetOperations
-        total_secs = 0
-        has_any = False
-        for i in range(tree.topLevelItemCount()):
-            item = tree.topLevelItem(i)
-            if item.checkState(0) != QtCore.Qt.CheckState.Checked:
-                continue
-            secs = _parse_cycle_time(item.text(1))
-            if secs is not None:
-                total_secs += secs
-                has_any = True
-        self.dialog.labelTotalTime.setText(
-            translate("CAM_Post", "Total: {}").format(
-                _format_seconds(total_secs) if has_any else "-"
-            )
-        )
-
     def _on_ops_changed(self, _item, _col=None):
         self._update_ops_tab_label()
-        self._update_total_time()
 
     def _select_all_ops(self):
         tree = self.dialog.treeWidgetOperations
@@ -792,12 +770,12 @@ class PostProcessDialog:
         dlg.exec_()
 
     def _format_workplan(self, processor):
-        """Format the workplan text similar to the export function provided."""
+        """Format the workplan text with per-item cycle times and a grand total."""
         from Path.Post.PostList import buildPostList
 
         lines = []
         lines.append("=" * 80)
-        lines.append("POSTABLES LIST")
+        lines.append("WORKPLAN")
         lines.append("=" * 80)
         lines.append("")
         lines.append(f"Job: {processor._job.Label}")
@@ -807,6 +785,8 @@ class PostProcessDialog:
         lines.append("")
 
         postables = buildPostList(processor)
+        total_secs = 0
+        has_any_time = False
 
         for idx, postable in enumerate(postables, 1):
             group_key = postable[0]
@@ -818,6 +798,9 @@ class PostProcessDialog:
             else:
                 display_key = f'"{group_key}"'
 
+            group_secs = 0
+            group_has_time = False
+
             lines.append(f"[{idx}] Postable Group: {display_key}")
             lines.append(f"    Objects: {len(objects)}")
             lines.append("")
@@ -825,8 +808,9 @@ class PostProcessDialog:
             for obj_idx, obj in enumerate(objects, 1):
                 lines.append(f"    [{obj_idx}] {obj.Label}")
 
-                # Determine object type/role
+                # Determine object type/role and extract cycle time
                 obj_type = None
+                cycle_time_str = None
                 if hasattr(obj, "item_type"):
                     # Postable object
                     obj_type = obj.item_type.title()
@@ -846,6 +830,12 @@ class PostProcessDialog:
                             )
                         else:
                             lines.append(f"        ToolController: None")
+                        # Cycle time from postable operation data
+                        src = getattr(obj, "source", None)
+                        if src is not None:
+                            cycle_time_str = getattr(src, "CycleTime", None)
+                        if cycle_time_str is None and hasattr(obj, "data"):
+                            cycle_time_str = obj.data.get("cycle_time")
                 else:
                     # Legacy object
                     if type(obj).__name__ == "_TempObject":
@@ -871,11 +861,25 @@ class PostProcessDialog:
                                 )
                             elif hasattr(obj, "ToolController"):
                                 lines.append("        ToolController: None")
+                            cycle_time_str = getattr(obj, "CycleTime", None)
                     else:
                         obj_type = type(obj).__name__
 
                 if obj_type:
                     lines.append(f"        Type: {obj_type}")
+
+                # Show cycle time for this item
+                if cycle_time_str:
+                    lines.append(f"        Cycle Time: {cycle_time_str}")
+                    secs = _parse_cycle_time(cycle_time_str)
+                    if secs is not None:
+                        group_secs += secs
+                        group_has_time = True
+
+            if group_has_time:
+                total_secs += group_secs
+                has_any_time = True
+                lines.append(f"    Group Time: {_format_seconds(group_secs)}")
 
             lines.append("")
 
@@ -883,6 +887,10 @@ class PostProcessDialog:
         lines.append(f"Total Groups: {len(postables)}")
         total_objects = sum(len(p[1]) for p in postables)
         lines.append(f"Total Objects: {total_objects}")
+        if has_any_time:
+            lines.append(f"Total Estimated Time: {_format_seconds(total_secs)}")
+        else:
+            lines.append("Total Estimated Time: -")
         lines.append("=" * 80)
 
         return "\n".join(lines)
