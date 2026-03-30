@@ -1004,9 +1004,21 @@ class MachineEditorDialog(QtGui.QDialog):
 
         layout.addRow(self.kinematics_group)
 
-        # Axes group
+        # Axes group – list/detail pattern
         self.axes_group = QtGui.QGroupBox(translate("CAM_MachineEditor", "Axes"))
-        self.axes_layout = QtGui.QVBoxLayout(self.axes_group)
+        axes_outer = QtGui.QHBoxLayout(self.axes_group)
+
+        # Left: axis list
+        self.axes_list = QtGui.QListWidget()
+        self.axes_list.setMaximumWidth(160)
+        self.axes_list.currentRowChanged.connect(self._on_axis_selected)
+
+        # Right: detail pages (one per axis, switched on selection)
+        self.axes_stack = QtGui.QStackedWidget()
+
+        axes_outer.addWidget(self.axes_list)
+        axes_outer.addWidget(self.axes_stack, 1)
+
         self.axes_group.setVisible(False)  # Initially hidden, shown when axes are configured
         layout.addRow(self.axes_group)
 
@@ -1034,9 +1046,9 @@ class MachineEditorDialog(QtGui.QDialog):
     def update_axes(self):
         """Update the axes configuration UI based on machine type and units.
 
-        Dynamically creates input fields for all axes based on the selected
-        machine type. Supports enhanced multi-axis configuration with roles,
-        parent relationships, and joint configuration.
+        Uses a list/detail pattern: the left-hand QListWidget shows every
+        axis (e.g. "X (linear)") and clicking one shows the corresponding
+        detail form in the QStackedWidget on the right.
         """
         # Get current units for suffixes and conversion
         units = self.units_combo.itemData(self.units_combo.currentIndex())
@@ -1052,14 +1064,15 @@ class MachineEditorDialog(QtGui.QDialog):
         # Clear references before deleting widgets
         self.axis_edits = {}
 
-        # Clear existing axes widgets and disconnect signals
-        for i in reversed(range(self.axes_layout.count())):
-            widget = self.axes_layout.itemAt(i).widget()
-            if widget:
-                # Disconnect all signals to prevent callbacks to deleted widgets
-                widget.blockSignals(True)
-                widget.deleteLater()
-                self.axes_layout.removeWidget(widget)
+        # Clear existing list items and stacked pages
+        self.axes_list.blockSignals(True)
+        self.axes_list.clear()
+        while self.axes_stack.count():
+            w = self.axes_stack.widget(0)
+            self.axes_stack.removeWidget(w)
+            w.blockSignals(True)
+            w.deleteLater()
+        self.axes_list.blockSignals(False)
 
         # Get current type
         type_key = self.type_combo.itemData(self.type_combo.currentIndex())
@@ -1078,401 +1091,363 @@ class MachineEditorDialog(QtGui.QDialog):
             if not config_axes:
                 self.axes_group.setVisible(False)
                 return
-            # Use config axes for new machines
             all_axis_names = config_axes
 
         # Show axes group since we have axes
         self.axes_group.setVisible(True)
 
-        # Linear axes
-        if linear_axes:
-            linear_group = QtGui.QGroupBox("Linear Axes")
-            linear_layout = QtGui.QFormLayout(linear_group)
+        # Build one list item + one detail page per axis
+        for axis in linear_axes:
+            self.axes_list.addItem(f"{axis} (linear)")
+            page = self._build_linear_axis_page(
+                axis, all_axis_names, units, length_suffix, vel_suffix
+            )
+            self.axes_stack.addWidget(page)
 
-            for axis in linear_axes:
-                axis_obj = self.machine.linear_axes[axis]
+        for axis in rotary_axes:
+            self.axes_list.addItem(f"{axis} (rotary)")
+            page = self._build_rotary_axis_page(
+                axis, all_axis_names, angle_suffix, angle_vel_suffix
+            )
+            self.axes_stack.addWidget(page)
 
-                # Create grid layout for this axis
-                axis_grid = QtGui.QGridLayout()
+        # Select first axis by default
+        if self.axes_list.count():
+            self.axes_list.setCurrentRow(0)
 
-                # Role dropdown
-                role_combo = QtGui.QComboBox()
-                for role in AxisRole:
-                    if role in [AxisRole.TABLE_LINEAR, AxisRole.HEAD_LINEAR]:
-                        role_combo.addItem(role.value.replace("_", " ").title(), role)
-                current_role_index = role_combo.findData(axis_obj.role)
-                if current_role_index >= 0:
-                    role_combo.setCurrentIndex(current_role_index)
-                role_combo.currentIndexChanged.connect(
-                    lambda idx, ax=axis, combo=role_combo: self._on_axis_role_changed(
-                        ax, combo, "linear"
-                    )
-                )
+    def _on_axis_selected(self, row):
+        """Switch the detail page when the user clicks an axis in the list."""
+        if 0 <= row < self.axes_stack.count():
+            self.axes_stack.setCurrentIndex(row)
 
-                # Parent dropdown
-                parent_combo = QtGui.QComboBox()
-                parent_combo.addItem("BaseFrame", None)
-                for other_axis in all_axis_names:
-                    if other_axis != axis:
-                        parent_combo.addItem(other_axis, other_axis)
-                if axis_obj.parent:
-                    parent_index = parent_combo.findData(axis_obj.parent)
-                    if parent_index >= 0:
-                        parent_combo.setCurrentIndex(parent_index)
-                parent_combo.currentIndexChanged.connect(
-                    lambda idx, ax=axis, combo=parent_combo: self._on_axis_parent_changed(
-                        ax, combo, "linear"
-                    )
-                )
+    # ------------------------------------------------------------------
+    # Axis detail-page builders
+    # ------------------------------------------------------------------
 
-                # Sequence
-                sequence_spin = QtGui.QSpinBox()
-                sequence_spin.setRange(0, 10)
-                sequence_spin.setValue(axis_obj.sequence)
-                sequence_spin.valueChanged.connect(
-                    lambda value, ax=axis: self._on_axis_sequence_changed(ax, value, "linear")
-                )
+    def _build_linear_axis_page(self, axis, all_axis_names, units, length_suffix, vel_suffix):
+        """Build and return a QWidget detail page for a single linear axis."""
+        axis_obj = self.machine.linear_axes[axis]
+        page = QtGui.QWidget()
+        form = QtGui.QFormLayout(page)
 
-                # Direction vector combo
-                direction_combo = QtGui.QComboBox()
-                for label, vector in self.ROTATIONAL_AXIS_OPTIONS:
-                    direction_combo.addItem(label, vector)
-                direction_vec = [
-                    axis_obj.direction_vector.x,
-                    axis_obj.direction_vector.y,
-                    axis_obj.direction_vector.z,
-                ]
-                for i, (label, vector) in enumerate(self.ROTATIONAL_AXIS_OPTIONS):
-                    if vector == direction_vec:
-                        direction_combo.setCurrentIndex(i)
-                        break
-                direction_combo.currentIndexChanged.connect(
-                    lambda idx, ax=axis, combo=direction_combo: self._on_linear_direction_changed(
-                        ax, combo
-                    )
-                )
+        # Role
+        role_combo = QtGui.QComboBox()
+        for role in AxisRole:
+            if role in [AxisRole.TABLE_LINEAR, AxisRole.HEAD_LINEAR]:
+                role_combo.addItem(role.value.replace("_", " ").title(), role)
+        idx = role_combo.findData(axis_obj.role)
+        if idx >= 0:
+            role_combo.setCurrentIndex(idx)
+        role_combo.currentIndexChanged.connect(
+            lambda _idx, ax=axis, c=role_combo: self._on_axis_role_changed(ax, c, "linear")
+        )
+        form.addRow(translate("CAM_MachineEditor", "Role"), role_combo)
 
-                # Limits and velocity
-                converted_min = (
-                    axis_obj.min_limit if units == "metric" else axis_obj.min_limit / 25.4
-                )
-                min_edit = QtGui.QLineEdit()
-                min_edit.setText(f"{converted_min:.2f}{length_suffix}")
-                min_edit.editingFinished.connect(
-                    lambda edit=min_edit, suffix=length_suffix.strip(), ax=axis, fld="min": self.normalize_text(
-                        edit, suffix, ax, fld
-                    )
-                )
+        # Parent
+        parent_combo = QtGui.QComboBox()
+        parent_combo.addItem("BaseFrame", None)
+        for other in all_axis_names:
+            if other != axis:
+                parent_combo.addItem(other, other)
+        if axis_obj.parent:
+            pi = parent_combo.findData(axis_obj.parent)
+            if pi >= 0:
+                parent_combo.setCurrentIndex(pi)
+        parent_combo.currentIndexChanged.connect(
+            lambda _idx, ax=axis, c=parent_combo: self._on_axis_parent_changed(ax, c, "linear")
+        )
+        form.addRow(translate("CAM_MachineEditor", "Parent"), parent_combo)
 
-                converted_max = (
-                    axis_obj.max_limit if units == "metric" else axis_obj.max_limit / 25.4
-                )
-                max_edit = QtGui.QLineEdit()
-                max_edit.setText(f"{converted_max:.2f}{length_suffix}")
-                max_edit.editingFinished.connect(
-                    lambda edit=max_edit, suffix=length_suffix.strip(), ax=axis, fld="max": self.normalize_text(
-                        edit, suffix, ax, fld
-                    )
-                )
+        # Sequence
+        sequence_spin = QtGui.QSpinBox()
+        sequence_spin.setRange(0, 10)
+        sequence_spin.setValue(axis_obj.sequence)
+        sequence_spin.valueChanged.connect(
+            lambda v, ax=axis: self._on_axis_sequence_changed(ax, v, "linear")
+        )
+        form.addRow(translate("CAM_MachineEditor", "Sequence"), sequence_spin)
 
-                converted_vel = (
-                    axis_obj.max_velocity if units == "metric" else axis_obj.max_velocity / 25.4
-                )
-                vel_edit = QtGui.QLineEdit()
-                vel_edit.setText(f"{converted_vel:.2f}{vel_suffix}")
-                vel_edit.editingFinished.connect(
-                    lambda edit=vel_edit, suffix=vel_suffix.strip(), ax=axis, fld="max_velocity": self.normalize_text(
-                        edit, suffix, ax, fld
-                    )
-                )
+        # Direction
+        direction_combo = QtGui.QComboBox()
+        for label, vector in self.ROTATIONAL_AXIS_OPTIONS:
+            direction_combo.addItem(label, vector)
+        direction_vec = [
+            axis_obj.direction_vector.x,
+            axis_obj.direction_vector.y,
+            axis_obj.direction_vector.z,
+        ]
+        for i, (_label, vector) in enumerate(self.ROTATIONAL_AXIS_OPTIONS):
+            if vector == direction_vec:
+                direction_combo.setCurrentIndex(i)
+                break
+        direction_combo.currentIndexChanged.connect(
+            lambda _idx, ax=axis, c=direction_combo: self._on_linear_direction_changed(ax, c)
+        )
+        form.addRow(translate("CAM_MachineEditor", "Direction"), direction_combo)
 
-                # Joint origin
-                origin_x_spin = QtGui.QDoubleSpinBox()
-                origin_x_spin.setRange(-9999, 9999)
-                origin_x_spin.setDecimals(3)
-                origin_x_spin.setValue(axis_obj.joint_origin[0])
+        # Limits & velocity
+        converted_min = axis_obj.min_limit if units == "metric" else axis_obj.min_limit / 25.4
+        min_edit = QtGui.QLineEdit()
+        min_edit.setText(f"{converted_min:.2f}{length_suffix}")
+        min_edit.editingFinished.connect(
+            lambda e=min_edit, s=length_suffix.strip(), ax=axis: self.normalize_text(
+                e, s, ax, "min"
+            )
+        )
+        form.addRow(translate("CAM_MachineEditor", "Min Limit"), min_edit)
 
-                origin_y_spin = QtGui.QDoubleSpinBox()
-                origin_y_spin.setRange(-9999, 9999)
-                origin_y_spin.setDecimals(3)
-                origin_y_spin.setValue(axis_obj.joint_origin[1])
+        converted_max = axis_obj.max_limit if units == "metric" else axis_obj.max_limit / 25.4
+        max_edit = QtGui.QLineEdit()
+        max_edit.setText(f"{converted_max:.2f}{length_suffix}")
+        max_edit.editingFinished.connect(
+            lambda e=max_edit, s=length_suffix.strip(), ax=axis: self.normalize_text(
+                e, s, ax, "max"
+            )
+        )
+        form.addRow(translate("CAM_MachineEditor", "Max Limit"), max_edit)
 
-                origin_z_spin = QtGui.QDoubleSpinBox()
-                origin_z_spin.setRange(-9999, 9999)
-                origin_z_spin.setDecimals(3)
-                origin_z_spin.setValue(axis_obj.joint_origin[2])
+        converted_vel = axis_obj.max_velocity if units == "metric" else axis_obj.max_velocity / 25.4
+        vel_edit = QtGui.QLineEdit()
+        vel_edit.setText(f"{converted_vel:.2f}{vel_suffix}")
+        vel_edit.editingFinished.connect(
+            lambda e=vel_edit, s=vel_suffix.strip(), ax=axis: self.normalize_text(
+                e, s, ax, "max_velocity"
+            )
+        )
+        form.addRow(translate("CAM_MachineEditor", "Max Velocity"), vel_edit)
 
-                def update_joint_origin(ax, x_val, y_val, z_val):
-                    self._on_joint_origin_changed(ax, [x_val, y_val, z_val], "linear")
+        # Joint origin
+        origin_x_spin = QtGui.QDoubleSpinBox()
+        origin_x_spin.setRange(-9999, 9999)
+        origin_x_spin.setDecimals(3)
+        origin_x_spin.setValue(axis_obj.joint_origin[0])
 
-                origin_x_spin.valueChanged.connect(
-                    lambda v, ax=axis: update_joint_origin(
-                        ax, v, origin_y_spin.value(), origin_z_spin.value()
-                    )
-                )
-                origin_y_spin.valueChanged.connect(
-                    lambda v, ax=axis: update_joint_origin(
-                        ax, origin_x_spin.value(), v, origin_z_spin.value()
-                    )
-                )
-                origin_z_spin.valueChanged.connect(
-                    lambda v, ax=axis: update_joint_origin(
-                        ax, origin_x_spin.value(), origin_y_spin.value(), v
-                    )
-                )
+        origin_y_spin = QtGui.QDoubleSpinBox()
+        origin_y_spin.setRange(-9999, 9999)
+        origin_y_spin.setDecimals(3)
+        origin_y_spin.setValue(axis_obj.joint_origin[1])
 
-                # Layout the grid
-                axis_grid.addWidget(QtGui.QLabel("Role:"), 0, 0, QtCore.Qt.AlignRight)
-                axis_grid.addWidget(role_combo, 0, 1)
-                axis_grid.addWidget(QtGui.QLabel("Parent:"), 0, 2, QtCore.Qt.AlignRight)
-                axis_grid.addWidget(parent_combo, 0, 3)
-                axis_grid.addWidget(QtGui.QLabel("Seq:"), 0, 4, QtCore.Qt.AlignRight)
-                axis_grid.addWidget(sequence_spin, 0, 5)
-                axis_grid.addWidget(QtGui.QLabel("Dir:"), 0, 6, QtCore.Qt.AlignRight)
-                axis_grid.addWidget(direction_combo, 0, 7)
+        origin_z_spin = QtGui.QDoubleSpinBox()
+        origin_z_spin.setRange(-9999, 9999)
+        origin_z_spin.setDecimals(3)
+        origin_z_spin.setValue(axis_obj.joint_origin[2])
 
-                axis_grid.addWidget(QtGui.QLabel("Min:"), 1, 0, QtCore.Qt.AlignRight)
-                axis_grid.addWidget(min_edit, 1, 1)
-                axis_grid.addWidget(QtGui.QLabel("Max:"), 1, 2, QtCore.Qt.AlignRight)
-                axis_grid.addWidget(max_edit, 1, 3)
-                axis_grid.addWidget(QtGui.QLabel("Vel:"), 1, 4, QtCore.Qt.AlignRight)
-                axis_grid.addWidget(vel_edit, 1, 5)
+        def _update_origin(ax, xv, yv, zv):
+            self._on_joint_origin_changed(ax, [xv, yv, zv], "linear")
 
-                axis_grid.addWidget(QtGui.QLabel("Origin:"), 2, 0, QtCore.Qt.AlignRight)
-                axis_grid.addWidget(origin_x_spin, 2, 1)
-                axis_grid.addWidget(origin_y_spin, 2, 2)
-                axis_grid.addWidget(origin_z_spin, 2, 3)
+        origin_x_spin.valueChanged.connect(
+            lambda v, ax=axis: _update_origin(ax, v, origin_y_spin.value(), origin_z_spin.value())
+        )
+        origin_y_spin.valueChanged.connect(
+            lambda v, ax=axis: _update_origin(ax, origin_x_spin.value(), v, origin_z_spin.value())
+        )
+        origin_z_spin.valueChanged.connect(
+            lambda v, ax=axis: _update_origin(ax, origin_x_spin.value(), origin_y_spin.value(), v)
+        )
 
-                axis_label = QtGui.QLabel(f"{axis}")
-                axis_label.setMinimumWidth(30)
-                linear_layout.addRow(axis_label, axis_grid)
+        origin_row = QtGui.QHBoxLayout()
+        origin_row.addWidget(QtGui.QLabel("X"))
+        origin_row.addWidget(origin_x_spin)
+        origin_row.addWidget(QtGui.QLabel("Y"))
+        origin_row.addWidget(origin_y_spin)
+        origin_row.addWidget(QtGui.QLabel("Z"))
+        origin_row.addWidget(origin_z_spin)
+        form.addRow(translate("CAM_MachineEditor", "Joint Origin"), origin_row)
 
-                self.axis_edits[axis] = {
-                    "role": role_combo,
-                    "parent": parent_combo,
-                    "sequence": sequence_spin,
-                    "direction": direction_combo,
-                    "min": min_edit,
-                    "max": max_edit,
-                    "max_velocity": vel_edit,
-                    "origin_x": origin_x_spin,
-                    "origin_y": origin_y_spin,
-                    "origin_z": origin_z_spin,
-                    "type": "linear",
-                }
-            self.axes_layout.addWidget(linear_group)
+        form.addItem(
+            QtGui.QSpacerItem(0, 0, QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
+        )
 
-        # Rotary axes
-        if rotary_axes:
-            rotary_group = QtGui.QGroupBox("Rotary Axes")
-            rotary_layout = QtGui.QFormLayout(rotary_group)
+        self.axis_edits[axis] = {
+            "role": role_combo,
+            "parent": parent_combo,
+            "sequence": sequence_spin,
+            "direction": direction_combo,
+            "min": min_edit,
+            "max": max_edit,
+            "max_velocity": vel_edit,
+            "origin_x": origin_x_spin,
+            "origin_y": origin_y_spin,
+            "origin_z": origin_z_spin,
+            "type": "linear",
+        }
+        return page
 
-            for axis in rotary_axes:
-                axis_obj = self.machine.rotary_axes[axis]
+    def _build_rotary_axis_page(self, axis, all_axis_names, angle_suffix, angle_vel_suffix):
+        """Build and return a QWidget detail page for a single rotary axis."""
+        axis_obj = self.machine.rotary_axes[axis]
+        page = QtGui.QWidget()
+        form = QtGui.QFormLayout(page)
 
-                # Create grid layout for this axis
-                axis_grid = QtGui.QGridLayout()
+        # Role
+        role_combo = QtGui.QComboBox()
+        for role in AxisRole:
+            if role in [AxisRole.TABLE_ROTARY, AxisRole.HEAD_ROTARY]:
+                role_combo.addItem(role.value.replace("_", " ").title(), role)
+        idx = role_combo.findData(axis_obj.role)
+        if idx >= 0:
+            role_combo.setCurrentIndex(idx)
+        role_combo.currentIndexChanged.connect(
+            lambda _idx, ax=axis, c=role_combo: self._on_axis_role_changed(ax, c, "rotary")
+        )
+        form.addRow(translate("CAM_MachineEditor", "Role"), role_combo)
 
-                # Role dropdown
-                role_combo = QtGui.QComboBox()
-                for role in AxisRole:
-                    if role in [AxisRole.TABLE_ROTARY, AxisRole.HEAD_ROTARY]:
-                        role_combo.addItem(role.value.replace("_", " ").title(), role)
-                current_role_index = role_combo.findData(axis_obj.role)
-                if current_role_index >= 0:
-                    role_combo.setCurrentIndex(current_role_index)
-                role_combo.currentIndexChanged.connect(
-                    lambda idx, ax=axis, combo=role_combo: self._on_axis_role_changed(
-                        ax, combo, "rotary"
-                    )
-                )
+        # Parent
+        parent_combo = QtGui.QComboBox()
+        parent_combo.addItem("BaseFrame", None)
+        for other in all_axis_names:
+            if other != axis:
+                parent_combo.addItem(other, other)
+        if axis_obj.parent:
+            pi = parent_combo.findData(axis_obj.parent)
+            if pi >= 0:
+                parent_combo.setCurrentIndex(pi)
+        parent_combo.currentIndexChanged.connect(
+            lambda _idx, ax=axis, c=parent_combo: self._on_axis_parent_changed(ax, c, "rotary")
+        )
+        form.addRow(translate("CAM_MachineEditor", "Parent"), parent_combo)
 
-                # Parent dropdown
-                parent_combo = QtGui.QComboBox()
-                parent_combo.addItem("BaseFrame", None)
-                for other_axis in all_axis_names:
-                    if other_axis != axis:
-                        parent_combo.addItem(other_axis, other_axis)
-                if axis_obj.parent:
-                    parent_index = parent_combo.findData(axis_obj.parent)
-                    if parent_index >= 0:
-                        parent_combo.setCurrentIndex(parent_index)
-                parent_combo.currentIndexChanged.connect(
-                    lambda idx, ax=axis, combo=parent_combo: self._on_axis_parent_changed(
-                        ax, combo, "rotary"
-                    )
-                )
+        # Sequence
+        sequence_spin = QtGui.QSpinBox()
+        sequence_spin.setRange(0, 10)
+        sequence_spin.setValue(axis_obj.sequence)
+        sequence_spin.valueChanged.connect(
+            lambda v, ax=axis: self._on_axis_sequence_changed(ax, v, "rotary")
+        )
+        form.addRow(translate("CAM_MachineEditor", "Sequence"), sequence_spin)
 
-                # Sequence
-                sequence_spin = QtGui.QSpinBox()
-                sequence_spin.setRange(0, 10)
-                sequence_spin.setValue(axis_obj.sequence)
-                sequence_spin.valueChanged.connect(
-                    lambda value, ax=axis: self._on_axis_sequence_changed(ax, value, "rotary")
-                )
+        # Limits & velocity
+        min_edit = QtGui.QLineEdit()
+        min_edit.setText(f"{axis_obj.min_limit:.2f}{angle_suffix}")
+        min_edit.editingFinished.connect(
+            lambda e=min_edit, s=angle_suffix.strip(), ax=axis: self.normalize_text(e, s, ax, "min")
+        )
+        form.addRow(translate("CAM_MachineEditor", "Min Limit"), min_edit)
 
-                # Limits and velocity
-                min_edit = QtGui.QLineEdit()
-                min_edit.setText(f"{axis_obj.min_limit:.2f}{angle_suffix}")
-                min_edit.editingFinished.connect(
-                    lambda edit=min_edit, suffix=angle_suffix.strip(), ax=axis, fld="min": self.normalize_text(
-                        edit, suffix, ax, fld
-                    )
-                )
+        max_edit = QtGui.QLineEdit()
+        max_edit.setText(f"{axis_obj.max_limit:.2f}{angle_suffix}")
+        max_edit.editingFinished.connect(
+            lambda e=max_edit, s=angle_suffix.strip(), ax=axis: self.normalize_text(e, s, ax, "max")
+        )
+        form.addRow(translate("CAM_MachineEditor", "Max Limit"), max_edit)
 
-                max_edit = QtGui.QLineEdit()
-                max_edit.setText(f"{axis_obj.max_limit:.2f}{angle_suffix}")
-                max_edit.editingFinished.connect(
-                    lambda edit=max_edit, suffix=angle_suffix.strip(), ax=axis, fld="max": self.normalize_text(
-                        edit, suffix, ax, fld
-                    )
-                )
+        vel_edit = QtGui.QLineEdit()
+        vel_edit.setText(f"{axis_obj.max_velocity:.2f}{angle_vel_suffix}")
+        vel_edit.editingFinished.connect(
+            lambda e=vel_edit, s=angle_vel_suffix.strip(), ax=axis: self.normalize_text(
+                e, s, ax, "max_velocity"
+            )
+        )
+        form.addRow(translate("CAM_MachineEditor", "Max Velocity"), vel_edit)
 
-                vel_edit = QtGui.QLineEdit()
-                vel_edit.setText(f"{axis_obj.max_velocity:.2f}{angle_vel_suffix}")
-                vel_edit.editingFinished.connect(
-                    lambda edit=vel_edit, suffix=angle_vel_suffix.strip(), ax=axis, fld="max_velocity": self.normalize_text(
-                        edit, suffix, ax, fld
-                    )
-                )
+        # Rotation vector (joint axis)
+        joint_combo = QtGui.QComboBox()
+        for label, vector in self.ROTATIONAL_AXIS_OPTIONS:
+            joint_combo.addItem(label, vector)
+        rotation_vec = [
+            axis_obj.rotation_vector.x,
+            axis_obj.rotation_vector.y,
+            axis_obj.rotation_vector.z,
+        ]
+        for i, (_label, vector) in enumerate(self.ROTATIONAL_AXIS_OPTIONS):
+            if vector == rotation_vec:
+                joint_combo.setCurrentIndex(i)
+                break
+        joint_combo.currentIndexChanged.connect(
+            lambda _idx, ax=axis, c=joint_combo: self._on_rotary_joint_changed(ax, c)
+        )
+        form.addRow(translate("CAM_MachineEditor", "Rotation Axis"), joint_combo)
 
-                # Joint axis combo
-                joint_combo = QtGui.QComboBox()
-                for label, vector in self.ROTATIONAL_AXIS_OPTIONS:
-                    joint_combo.addItem(label, vector)
-                rotation_vec = [
-                    axis_obj.rotation_vector.x,
-                    axis_obj.rotation_vector.y,
-                    axis_obj.rotation_vector.z,
-                ]
-                for i, (label, vector) in enumerate(self.ROTATIONAL_AXIS_OPTIONS):
-                    if vector == rotation_vec:
-                        joint_combo.setCurrentIndex(i)
-                        break
-                joint_combo.currentIndexChanged.connect(
-                    lambda index, ax=axis, combo=joint_combo: self._on_rotary_joint_changed(
-                        ax, combo
-                    )
-                )
+        # Joint origin
+        origin_x_spin = QtGui.QDoubleSpinBox()
+        origin_x_spin.setRange(-9999, 9999)
+        origin_x_spin.setDecimals(3)
+        origin_x_spin.setValue(axis_obj.joint_origin[0])
 
-                # Joint origin
-                origin_x_spin = QtGui.QDoubleSpinBox()
-                origin_x_spin.setRange(-9999, 9999)
-                origin_x_spin.setDecimals(3)
-                origin_x_spin.setValue(axis_obj.joint_origin[0])
+        origin_y_spin = QtGui.QDoubleSpinBox()
+        origin_y_spin.setRange(-9999, 9999)
+        origin_y_spin.setDecimals(3)
+        origin_y_spin.setValue(axis_obj.joint_origin[1])
 
-                origin_y_spin = QtGui.QDoubleSpinBox()
-                origin_y_spin.setRange(-9999, 9999)
-                origin_y_spin.setDecimals(3)
-                origin_y_spin.setValue(axis_obj.joint_origin[1])
+        origin_z_spin = QtGui.QDoubleSpinBox()
+        origin_z_spin.setRange(-9999, 9999)
+        origin_z_spin.setDecimals(3)
+        origin_z_spin.setValue(axis_obj.joint_origin[2])
 
-                origin_z_spin = QtGui.QDoubleSpinBox()
-                origin_z_spin.setRange(-9999, 9999)
-                origin_z_spin.setDecimals(3)
-                origin_z_spin.setValue(axis_obj.joint_origin[2])
+        def _update_origin(ax, xv, yv, zv):
+            self._on_joint_origin_changed(ax, [xv, yv, zv], "rotary")
 
-                def update_rotary_origin(ax, x_val, y_val, z_val):
-                    self._on_joint_origin_changed(ax, [x_val, y_val, z_val], "rotary")
+        origin_x_spin.valueChanged.connect(
+            lambda v, ax=axis: _update_origin(ax, v, origin_y_spin.value(), origin_z_spin.value())
+        )
+        origin_y_spin.valueChanged.connect(
+            lambda v, ax=axis: _update_origin(ax, origin_x_spin.value(), v, origin_z_spin.value())
+        )
+        origin_z_spin.valueChanged.connect(
+            lambda v, ax=axis: _update_origin(ax, origin_x_spin.value(), origin_y_spin.value(), v)
+        )
 
-                origin_x_spin.valueChanged.connect(
-                    lambda v, ax=axis: update_rotary_origin(
-                        ax, v, origin_y_spin.value(), origin_z_spin.value()
-                    )
-                )
-                origin_y_spin.valueChanged.connect(
-                    lambda v, ax=axis: update_rotary_origin(
-                        ax, origin_x_spin.value(), v, origin_z_spin.value()
-                    )
-                )
-                origin_z_spin.valueChanged.connect(
-                    lambda v, ax=axis: update_rotary_origin(
-                        ax, origin_x_spin.value(), origin_y_spin.value(), v
-                    )
-                )
+        origin_row = QtGui.QHBoxLayout()
+        origin_row.addWidget(QtGui.QLabel("X"))
+        origin_row.addWidget(origin_x_spin)
+        origin_row.addWidget(QtGui.QLabel("Y"))
+        origin_row.addWidget(origin_y_spin)
+        origin_row.addWidget(QtGui.QLabel("Z"))
+        origin_row.addWidget(origin_z_spin)
+        form.addRow(translate("CAM_MachineEditor", "Joint Origin"), origin_row)
 
-                # Solution preference
-                solution_combo = QtGui.QComboBox()
-                solution_combo.addItem("Shortest", "shortest")
-                solution_combo.addItem("Positive", "positive")
-                solution_combo.addItem("Negative", "negative")
-                current_solution_index = solution_combo.findData(axis_obj.solution_preference)
-                if current_solution_index >= 0:
-                    solution_combo.setCurrentIndex(current_solution_index)
-                solution_combo.currentIndexChanged.connect(
-                    lambda idx, ax=axis, combo=solution_combo: self._on_solution_preference_changed(
-                        ax, combo
-                    )
-                )
+        # Solution preference
+        solution_combo = QtGui.QComboBox()
+        solution_combo.addItem("Shortest", "shortest")
+        solution_combo.addItem("Positive", "positive")
+        solution_combo.addItem("Negative", "negative")
+        si = solution_combo.findData(axis_obj.solution_preference)
+        if si >= 0:
+            solution_combo.setCurrentIndex(si)
+        solution_combo.currentIndexChanged.connect(
+            lambda _idx, ax=axis, c=solution_combo: self._on_solution_preference_changed(ax, c)
+        )
+        form.addRow(translate("CAM_MachineEditor", "Solution Preference"), solution_combo)
 
-                # Allow flip checkbox
-                allow_flip_check = QtGui.QCheckBox()
-                allow_flip_check.setChecked(axis_obj.allow_flip)
-                allow_flip_check.toggled.connect(
-                    lambda checked, ax=axis: self._on_allow_flip_changed(ax, checked)
-                )
+        # Allow flip
+        allow_flip_check = QtGui.QCheckBox()
+        allow_flip_check.setChecked(axis_obj.allow_flip)
+        allow_flip_check.toggled.connect(
+            lambda checked, ax=axis: self._on_allow_flip_changed(ax, checked)
+        )
+        form.addRow(translate("CAM_MachineEditor", "Allow Flip"), allow_flip_check)
 
-                # Legacy prefer_positive checkbox
-                prefer_positive_check = QtGui.QCheckBox()
-                prefer_positive_check.setChecked(axis_obj.prefer_positive)
-                prefer_positive_check.stateChanged.connect(
-                    lambda state, ax=axis: self._on_rotary_prefer_positive_changed(
-                        ax, state == QtCore.Qt.Checked
-                    )
-                )
+        # Legacy prefer_positive
+        prefer_positive_check = QtGui.QCheckBox()
+        prefer_positive_check.setChecked(axis_obj.prefer_positive)
+        prefer_positive_check.stateChanged.connect(
+            lambda state, ax=axis: self._on_rotary_prefer_positive_changed(
+                ax, state == QtCore.Qt.Checked
+            )
+        )
+        form.addRow(translate("CAM_MachineEditor", "Prefer Positive"), prefer_positive_check)
 
-                # Layout the grid
-                axis_grid.addWidget(QtGui.QLabel("Role:"), 0, 0, QtCore.Qt.AlignRight)
-                axis_grid.addWidget(role_combo, 0, 1)
-                axis_grid.addWidget(QtGui.QLabel("Parent:"), 0, 2, QtCore.Qt.AlignRight)
-                axis_grid.addWidget(parent_combo, 0, 3)
-                axis_grid.addWidget(QtGui.QLabel("Seq:"), 0, 4, QtCore.Qt.AlignRight)
-                axis_grid.addWidget(sequence_spin, 0, 5)
+        form.addItem(
+            QtGui.QSpacerItem(0, 0, QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
+        )
 
-                axis_grid.addWidget(QtGui.QLabel("Min:"), 1, 0, QtCore.Qt.AlignRight)
-                axis_grid.addWidget(min_edit, 1, 1)
-                axis_grid.addWidget(QtGui.QLabel("Max:"), 1, 2, QtCore.Qt.AlignRight)
-                axis_grid.addWidget(max_edit, 1, 3)
-                axis_grid.addWidget(QtGui.QLabel("Vel:"), 1, 4, QtCore.Qt.AlignRight)
-                axis_grid.addWidget(vel_edit, 1, 5)
-
-                axis_grid.addWidget(QtGui.QLabel("Joint:"), 2, 0, QtCore.Qt.AlignRight)
-                axis_grid.addWidget(joint_combo, 2, 1)
-                axis_grid.addWidget(QtGui.QLabel("Origin:"), 2, 2, QtCore.Qt.AlignRight)
-                axis_grid.addWidget(origin_x_spin, 2, 3)
-                axis_grid.addWidget(origin_y_spin, 2, 4)
-                axis_grid.addWidget(origin_z_spin, 2, 5)
-
-                axis_grid.addWidget(QtGui.QLabel("Solution:"), 3, 0, QtCore.Qt.AlignRight)
-                axis_grid.addWidget(solution_combo, 3, 1)
-                axis_grid.addWidget(QtGui.QLabel("Flip:"), 3, 2, QtCore.Qt.AlignRight)
-                axis_grid.addWidget(allow_flip_check, 3, 3)
-                axis_grid.addWidget(QtGui.QLabel("Prefer+:"), 3, 4, QtCore.Qt.AlignRight)
-                axis_grid.addWidget(prefer_positive_check, 3, 5)
-
-                axis_label = QtGui.QLabel(f"{axis}")
-                axis_label.setMinimumWidth(30)
-                rotary_layout.addRow(axis_label, axis_grid)
-
-                self.axis_edits[axis] = {
-                    "role": role_combo,
-                    "parent": parent_combo,
-                    "sequence": sequence_spin,
-                    "min": min_edit,
-                    "max": max_edit,
-                    "max_velocity": vel_edit,
-                    "joint": joint_combo,
-                    "origin_x": origin_x_spin,
-                    "origin_y": origin_y_spin,
-                    "origin_z": origin_z_spin,
-                    "solution": solution_combo,
-                    "allow_flip": allow_flip_check,
-                    "prefer_positive": prefer_positive_check,
-                    "type": "rotary",
-                }
-            self.axes_layout.addWidget(rotary_group)
-
-        # Show axes group if any axes configured
-        self.axes_group.setVisible(bool(linear_axes or rotary_axes))
+        self.axis_edits[axis] = {
+            "role": role_combo,
+            "parent": parent_combo,
+            "sequence": sequence_spin,
+            "min": min_edit,
+            "max": max_edit,
+            "max_velocity": vel_edit,
+            "joint": joint_combo,
+            "origin_x": origin_x_spin,
+            "origin_y": origin_y_spin,
+            "origin_z": origin_z_spin,
+            "solution": solution_combo,
+            "allow_flip": allow_flip_check,
+            "prefer_positive": prefer_positive_check,
+            "type": "rotary",
+        }
+        return page
 
     def update_toolheads(self):
         """Update the toolhead configuration UI based on toolhead count.
