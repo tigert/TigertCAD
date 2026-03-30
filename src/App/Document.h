@@ -197,6 +197,9 @@ public:
      * @{
      */
     // clang-format off
+    // Document-scoped signals use MainThreadSignal so GUI observers can rely on
+    // main-thread delivery even when recompute runs on a worker. Raw
+    // DocumentObject signals intentionally keep their same-thread semantics.
 
     /// Signal before changing a document property.
     App::MainThreadSignal<void(const Document&, const Property&)> signalBeforeChange;

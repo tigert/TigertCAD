@@ -37,6 +37,11 @@ namespace App
 
 // App owns these signal types because App::Document declares them. Gui installs
 // the actual main-thread hooks when a GUI application is available.
+//
+// These signals are intended for document-scoped notifications that GUI code
+// may observe while recompute can run on a worker thread. Raw
+// App::DocumentObject signals intentionally remain plain fastsignals with
+// same-thread semantics.
 class MainThreadSignalConfig
 {
 public:
