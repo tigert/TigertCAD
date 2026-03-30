@@ -82,7 +82,7 @@ class TestGuiDocument(unittest.TestCase):
 
     def testRefreshFallsBackToSyncForFeaturePython(self):
         params = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Document")
-        old_async = params.GetBool("EnableAsyncRecompute", False)
+        old_async = params.GetBool("EnableAsyncRecompute", True)
 
         class RefreshProxy:
             def __init__(self):

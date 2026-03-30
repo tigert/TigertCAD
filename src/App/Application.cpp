@@ -209,10 +209,10 @@ namespace fs = std::filesystem;
 namespace
 {
 
-RecomputeRequest takeNextRecomputeRequest(std::vector<RecomputeRequest>& requests)
+RecomputeRequest takeNextRecomputeRequest(std::deque<RecomputeRequest>& requests)
 {
     RecomputeRequest request = std::move(requests.front());
-    requests.erase(requests.begin());
+    requests.pop_front();
     return request;
 }
 
@@ -223,22 +223,34 @@ bool requestTargetsDocument(const RecomputeRequest& request, const std::string& 
 
 bool documentCanRecomputeOnWorker(const Document& document)
 {
-    const auto& objects = document.getObjects();
-    std::vector<DocumentObject*> recomputeRoots(objects.begin(), objects.end());
-    const auto recomputeObjects = Document::getDependencyList(recomputeRoots, Document::DepSort);
+    try {
+        const auto& objects = document.getObjects();
+        std::vector<DocumentObject*> recomputeRoots(objects.begin(), objects.end());
+        const auto recomputeObjects = Document::getDependencyList(recomputeRoots, Document::DepSort);
 
-    return std::ranges::all_of(recomputeObjects, [](const DocumentObject* object) {
-        return object && object->canRecomputeOnWorker();
-    });
+        return std::ranges::all_of(recomputeObjects, [](const DocumentObject* object) {
+            return object && object->canRecomputeOnWorker();
+        });
+    }
+    catch (const Base::BadGraphError&) {
+        return false;
+    }
 }
 
 void reportRecomputeException(const Base::Exception& exception)
 {
-    QMetaObject::invokeMethod(
-        qApp,
-        [exception]() mutable { exception.reportException(); },
-        Qt::QueuedConnection
-    );
+    if (App::MainThreadSignalConfig::hasHooks()) {
+        if (auto* app = QCoreApplication::instance()) {
+            QMetaObject::invokeMethod(
+                app,
+                [exception]() mutable { exception.reportException(); },
+                Qt::QueuedConnection
+            );
+            return;
+        }
+    }
+
+    exception.reportException();
 }
 
 RecomputeResult processRecomputeRequest(RecomputeRequest& request)
@@ -804,7 +816,7 @@ bool Application::isAsyncRecomputeEnabled()
     static const ParameterGrp::handle hGrp = GetParameterGroupByPath(
         "User parameter:BaseApp/Preferences/Document"
     );
-    bool enableAsyncRecompute = hGrp->GetBool("EnableAsyncRecompute", false);
+    bool enableAsyncRecompute = hGrp->GetBool("EnableAsyncRecompute", true);
     return enableAsyncRecompute;
 }
 

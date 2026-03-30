@@ -213,6 +213,9 @@ This feature may slightly increase recomputation time.</string>
         <property name="toolTip">
          <string>This experimental feature allows more responsive GUI while recomputing features.</string>
         </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
         <property name="text">
          <string>Enables async document recomputation</string>
         </property>
