@@ -2294,6 +2294,7 @@ void Application::initTypes()
     App::FeatureTestAbsAddress     ::init();
     App::FeatureTestPlacement      ::init();
     App::FeatureTestAttribute      ::init();
+    App::FeatureTestAsyncBlocker   ::init();
 
     // Feature class
     App::FeaturePython             ::init();

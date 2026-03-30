@@ -21,7 +21,12 @@
 *                                                                          *
 ***************************************************************************/"""
 
-import FreeCAD, FreeCADGui, unittest
+import threading
+import time
+import unittest
+
+import FreeCAD
+import FreeCADGui
 
 # ---------------------------------------------------------------------------
 # define the functions to test the FreeCAD Gui Document code
@@ -55,3 +60,51 @@ class TestGuiDocument(unittest.TestCase):
         # Check if the new function returns the correct root objects
         expected_root_objects = [group1, group2, obj1, part1]
         self.assertEqual(set(root_objects), set(expected_root_objects))
+
+    def testViewObjectRequiresMainThread(self):
+        obj = self.doc.addObject("App::FeaturePython", "ThreadGuard")
+
+        result = {}
+
+        def access_view_object():
+            try:
+                _ = obj.ViewObject
+            except Exception as exc:  # pragma: no cover - exercised through assertion below
+                result["exception"] = exc
+
+        worker = threading.Thread(target=access_view_object)
+        worker.start()
+        worker.join()
+
+        self.assertIn("exception", result)
+        self.assertIsInstance(result["exception"], RuntimeError)
+        self.assertIn("main thread", str(result["exception"]).lower())
+
+    def testRefreshFallsBackToSyncForFeaturePython(self):
+        params = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Document")
+        old_async = params.GetBool("EnableAsyncRecompute", False)
+
+        class RefreshProxy:
+            def __init__(self):
+                self.executed_thread_id = None
+
+            def execute(self, obj):
+                self.executed_thread_id = threading.get_ident()
+                time.sleep(0.05)
+
+        proxy = RefreshProxy()
+        obj = self.doc.addObject("App::FeaturePython", "PythonFeature")
+        obj.Proxy = proxy
+        obj.touch()
+
+        try:
+            params.SetBool("EnableAsyncRecompute", True)
+
+            start = time.monotonic()
+            FreeCADGui.runCommand("Std_Refresh", 0)
+            elapsed = time.monotonic() - start
+        finally:
+            params.SetBool("EnableAsyncRecompute", old_async)
+
+        self.assertEqual(proxy.executed_thread_id, threading.get_ident())
+        self.assertGreaterEqual(elapsed, 0.04)
