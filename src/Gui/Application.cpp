@@ -51,6 +51,7 @@
 
 #include <App/Document.h>
 #include <App/DocumentObjectPy.h>
+#include <App/MainThreadSignal.h>
 #include <Base/Console.h>
 #include <Base/Interpreter.h>
 #include <Base/Exception.h>
@@ -170,6 +171,18 @@ extern const long NlErrorCode;  // initialized before main() by navlib_load.cpp
 
 namespace Gui
 {
+
+void requireMainThread(const char* api)
+{
+    if (App::MainThreadSignalConfig::isMainThread()) {
+        return;
+    }
+
+    Base::Console().error("GUI API '%s' may only be used from the main thread.\n", api);
+    throw Base::RuntimeError(
+        std::string("GUI API '") + api + "' may only be used from the main thread"
+    );
+}
 
 class ViewProviderMap
 {
@@ -1699,6 +1712,7 @@ Gui::Document* Application::getDocument(const App::Document* pDoc) const
 
 void Application::showViewProvider(const App::DocumentObject* obj)
 {
+    requireMainThread("Gui::Application::showViewProvider");
     ViewProvider* vp = getViewProvider(obj);
     if (vp) {
         vp->show();
@@ -1707,6 +1721,7 @@ void Application::showViewProvider(const App::DocumentObject* obj)
 
 void Application::hideViewProvider(const App::DocumentObject* obj)
 {
+    requireMainThread("Gui::Application::hideViewProvider");
     ViewProvider* vp = getViewProvider(obj);
     if (vp) {
         vp->hide();
@@ -1715,6 +1730,7 @@ void Application::hideViewProvider(const App::DocumentObject* obj)
 
 Gui::ViewProvider* Application::getViewProvider(const App::DocumentObject* obj) const
 {
+    requireMainThread("Gui::Application::getViewProvider");
     return d->viewproviderMap.getViewProvider(obj);
 }
 
