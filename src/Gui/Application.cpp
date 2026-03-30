@@ -40,6 +40,7 @@
 #include <QSurfaceFormat>
 #include <QTextStream>
 #include <QTimer>
+#include <QThread>
 #include <QWindow>
 #include <QStyleFactory>
 
@@ -385,6 +386,46 @@ struct PyMethodDef FreeCADGui_methods[] = {
     {nullptr, nullptr, 0, nullptr} /* sentinel */
 };
 
+class MainThreadInvoker final : public QObject {
+public:
+    static MainThreadInvoker* instance() {
+        static MainThreadInvoker* inst = []{
+            auto* obj = new MainThreadInvoker();
+            // Ensure the object lives on the GUI thread
+            if (qApp && qApp->thread() && QThread::currentThread() != qApp->thread())
+                obj->moveToThread(qApp->thread());
+            return obj;
+        }();
+        return inst;
+    }
+private:
+    MainThreadInvoker() = default;
+    ~MainThreadInvoker() override = default;
+};
+
+// Hook: are we currently on the GUI (main) thread?
+bool qtIsMainThread()
+{
+    return !qApp || (QThread::currentThread() == qApp->thread());
+}
+
+// Hook: invoke a functor on the GUI thread, either blocking or queued.
+void qtInvokeOnMain(std::function<void()>&& fn, bool blocking)
+{
+    if (!qApp) {
+        fn();
+        return;
+    }
+
+    QMetaObject::invokeMethod(
+        MainThreadInvoker::instance(),
+        [f = std::move(fn)]() mutable {
+            f();
+        },
+        blocking ? Qt::BlockingQueuedConnection : Qt::QueuedConnection
+    );
+}
+
 }  // namespace Gui
 
 void Application::initStyleParameterManager()
@@ -464,11 +505,14 @@ void Application::initStyleParameterManager()
 
     Base::registerServiceImplementation(d->styleParameterManager);
 }
+
 // clang-format off
 Application::Application(bool GUIenabled)
 {
     // App::GetApplication().Attach(this);
     if (GUIenabled) {
+        App::MainThreadSignalConfig::setHooks(&qtIsMainThread, &qtInvokeOnMain);
+
         // NOLINTBEGIN
         App::GetApplication().signalNewDocument.connect(
             std::bind(&Gui::Application::slotNewDocument, this, sp::_1, sp::_2));

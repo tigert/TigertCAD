@@ -2761,17 +2761,20 @@ void Document::renameObjectIdentifiers(
     }
 }
 
-void Document::setPreRecomputeHook(const PreRecomputeHook& hook)
-{
-     d->_preRecomputeHook = hook;
-}
-
 int Document::recompute(const std::vector<DocumentObject*>& objs,
                         bool force,
                         bool* hasError,
                         int options)
 {
     ZoneScoped;
+
+    // Recompute can execute Python-backed features. Keep the GIL for the full
+    // recompute so async recompute still serializes Python execution the same
+    // way the main-thread path does, preserving compatibility with existing
+    // Python-backed objects and addons. Main-thread signal hops such as
+    // signalBeforeRecompute() temporarily release it when they need to run
+    // Python on the GUI thread to avoid deadlocks.
+    Base::PyGILStateLocker locker;
 
     if (d->undoing || d->rollback) {
         if (FC_LOG_INSTANCE.isEnabled(FC_LOGLEVEL_LOG)) {
@@ -2807,12 +2810,7 @@ int Document::recompute(const std::vector<DocumentObject*>& objs,
 
     Base::ObjectStatusLocker<Document::Status, Document> exe(Document::Recomputing, this);
 
-    // This will hop into the main thread, fire signalBeforeRecompute(),
-    // and *block* the worker until the main thread is done, avoiding races
-    // between any running Python code and the rest of the recompute call.
-    if (d->_preRecomputeHook) {
-        d->_preRecomputeHook();
-    }
+    signalBeforeRecompute(*this);
 
     //////////////////////////////////////////////////////////////////////////
     // FIXME Comment by Realthunder:
