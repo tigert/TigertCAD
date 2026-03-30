@@ -2649,7 +2649,7 @@ Document::getDependencyList(const std::vector<DocumentObject*>& objs, int option
                 ss << '\n';
             }
             FC_ERR(ss.str());
-            FC_THROWM(Base::RuntimeError, e.what());
+            FC_THROWM(Base::BadGraphError, e.what());
         }
         FC_ERR(e.what());
         ret = DocumentP::partialTopologicalSort(objs);

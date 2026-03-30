@@ -1186,6 +1186,17 @@ public:
     }
 
     /**
+     * @brief Whether this object's recompute path is safe to run on the worker thread.
+     *
+     * This is used by async recompute scheduling. Objects that can touch GUI or
+     * other thread-affine state during recompute must return false.
+     */
+    virtual bool canRecomputeOnWorker() const
+    {
+        return true;
+    }
+
+    /**
      * @brief Called when an element reference is updated.
      *
      * @param[in] prop The property that was updated.

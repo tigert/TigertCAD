@@ -214,6 +214,7 @@ public:
     FeatureTestAttribute();
     ~FeatureTestAttribute() override;
     DocumentObjectExecReturn* execute() override;
+    bool canRecomputeOnWorker() const override { return false; }
 
     App::PropertyPythonObject Object;
     App::PropertyString Attribute;
