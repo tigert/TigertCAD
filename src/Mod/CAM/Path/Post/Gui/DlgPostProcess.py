@@ -256,9 +256,6 @@ class PostProcessDialog:
 
         container.deleteLater()
 
-        # Populate non-runtime post-processor config on this (Options) tab
-        self._rebuild_post_config_section(machine, scroll_layout, insert_idx)
-
         # Populate runtime post-processor params on Overview tab
         self._rebuild_post_params_section(machine)
 
@@ -416,8 +413,7 @@ class PostProcessDialog:
                 try:
                     from Path.Post.Processor import PostProcessorFactory
 
-                    # Pass None as job to get the class for schema inspection
-                    post_obj = PostProcessorFactory.get_post_processor(None, postprocessor_name)
+                    post_obj = PostProcessorFactory.get_post_processor(self.job, postprocessor_name)
                     if post_obj is not None:
                         post_class = type(post_obj)
                 except Exception as e:
