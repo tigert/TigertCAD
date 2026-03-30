@@ -178,6 +178,7 @@ SET(PathPythonMachineUiEditor_SRCS
     Machine/ui/editor/machine_editor.py
     Machine/ui/editor/postprocessor_properties.py
     Machine/ui/editor/__init__.py
+    Machine/ui/editor/output_options_layout.py
 )
 
 SET(PathPythonMachineModels_SRCS

@@ -39,6 +39,7 @@ from Machine.models.machine import (
 from Path.Main.Gui.Editor import CodeEditor
 from Path.Post.Processor import PostProcessorFactory
 from Machine.ui.editor.postprocessor_properties import PostProcessorPropertyManager
+from Machine.ui.editor.output_options_layout import build_output_options
 import re
 
 translate = FreeCAD.Qt.translate
@@ -427,15 +428,10 @@ class MachineEditorDialog(QtGui.QDialog):
         self.tabs.addTab(self.postprocessor_tab, translate("CAM_MachineEditor", "Postprocessor"))
         self.setup_postprocessor_tab()
 
-        # Output Options tab
+        # Output & Processing tab (combined)
         self.output_tab = QtGui.QWidget()
-        self.tabs.addTab(self.output_tab, translate("CAM_MachineEditor", "Output Options"))
+        self.tabs.addTab(self.output_tab, translate("CAM_MachineEditor", "Options"))
         self.setup_output_tab()
-
-        # Processing Options tab
-        self.processing_tab = QtGui.QWidget()
-        self.tabs.addTab(self.processing_tab, translate("CAM_MachineEditor", "Processing Options"))
-        self.setup_processing_tab()
 
         # Check experimental flag for machine post processor
         param = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/CAM")
@@ -445,9 +441,6 @@ class MachineEditorDialog(QtGui.QDialog):
         )
         self.tabs.setTabVisible(
             self.tabs.indexOf(self.output_tab), self.enable_machine_postprocessor
-        )
-        self.tabs.setTabVisible(
-            self.tabs.indexOf(self.processing_tab), self.enable_machine_postprocessor
         )
         # Text editor (initially hidden)
         self.text_editor = CodeEditor()
@@ -1745,7 +1738,12 @@ class MachineEditorDialog(QtGui.QDialog):
         Path.Log.debug(f"update_toolheads() completed with {final_count} toolheads")
 
     def setup_output_tab(self):
-        """Set up the output options configuration tab."""
+        """Set up the combined output and processing options tab.
+
+        Uses the shared ``build_output_options`` helper so that the same
+        layout is produced in the Machine Editor and the Post-Processing
+        dialog.
+        """
         # Use scroll area for all the options
         scroll = QtGui.QScrollArea()
         scroll.setWidgetResizable(True)
@@ -1753,88 +1751,26 @@ class MachineEditorDialog(QtGui.QDialog):
         layout = QtGui.QVBoxLayout(scroll_widget)
         scroll.setWidget(scroll_widget)
 
-        main_layout = QtGui.QVBoxLayout(self.output_tab)
-        main_layout.addWidget(scroll)
+        tab_layout = QtGui.QVBoxLayout(self.output_tab)
+        tab_layout.addWidget(scroll)
 
-        # === Output Options ===
         if self.machine:
-            # Main output options
-            main_group = QtGui.QGroupBox(translate("CAM_MachineEditor", "Main Options"))
-            main_layout = QtGui.QFormLayout(main_group)
-
-            # Units
-            units_combo = QtGui.QComboBox()
-            units_combo.addItem("Metric", "metric")
-            units_combo.addItem("Imperial", "imperial")
-            units_str = self.machine.output.units.value
-            index = units_combo.findData(units_str)
-            if index >= 0:
-                units_combo.setCurrentIndex(index)
-            units_combo.currentIndexChanged.connect(
-                lambda idx: self._on_output_field_changed("units", units_combo.itemData(idx))
+            section_widgets = build_output_options(
+                self.machine, layout, context="CAM_MachineEditor"
             )
-            main_layout.addRow("Units", units_combo)
 
-            # Output tool length offset
-            tool_length_check = QtGui.QCheckBox()
-            tool_length_check.setChecked(self.machine.output.output_tool_length_offset)
-            tool_length_check.toggled.connect(
-                lambda checked: self._on_output_field_changed("output_tool_length_offset", checked)
-            )
-            main_layout.addRow("Output Tool Length Offset (G43)", tool_length_check)
-
-            # Output header
-            output_header_check = QtGui.QCheckBox()
-            output_header_check.setChecked(self.machine.output.output_header)
-            output_header_check.toggled.connect(
-                lambda checked: self._on_output_field_changed("output_header", checked)
-            )
-            main_layout.addRow("Output Header", output_header_check)
-
-            # Remote posting
-            remote_post_check = QtGui.QCheckBox()
-            remote_post_check.setChecked(self.machine.output.remote_post)
-            remote_post_check.toggled.connect(
-                lambda checked: self._on_output_field_changed("remote_post", checked)
-            )
-            main_layout.addRow("Enable Remote Posting", remote_post_check)
-
-            layout.addWidget(main_group)
-
-            # Header options
-            header_group, header_widgets = DataclassGUIGenerator.create_group_for_dataclass(
-                self.machine.output.header, "Header Options"
-            )
-            layout.addWidget(header_group)
-            self._connect_widgets_to_machine(header_widgets, "output.header")
-
-            # Comment options
-            comments_group, comments_widgets = DataclassGUIGenerator.create_group_for_dataclass(
-                self.machine.output.comments, "Comment Options"
-            )
-            layout.addWidget(comments_group)
-            self._connect_widgets_to_machine(comments_widgets, "output.comments")
-
-            # Formatting options
-            formatting_group, formatting_widgets = DataclassGUIGenerator.create_group_for_dataclass(
-                self.machine.output.formatting, "Formatting Options"
-            )
-            layout.addWidget(formatting_group)
-            self._connect_widgets_to_machine(formatting_widgets, "output.formatting")
-
-            # Precision options
-            precision_group, precision_widgets = DataclassGUIGenerator.create_group_for_dataclass(
-                self.machine.output.precision, "Precision Options"
-            )
-            layout.addWidget(precision_group)
-            self._connect_widgets_to_machine(precision_widgets, "output.precision")
-
-            # Duplicate options
-            duplicates_group, duplicates_widgets = DataclassGUIGenerator.create_group_for_dataclass(
-                self.machine.output.duplicates, "Duplicate Output Options"
-            )
-            layout.addWidget(duplicates_group)
-            self._connect_widgets_to_machine(duplicates_widgets, "output.duplicates")
+            # Wire every generated widget back to the Machine object so
+            # that edits are persisted in real-time (same as before).
+            output_sections = ("header", "comments", "formatting", "precision", "duplicates")
+            for section_name, widgets in section_widgets.items():
+                if section_name == "main":
+                    # Main output fields use a dedicated handler
+                    for field_name, widget in widgets.items():
+                        self._connect_main_output_widget(field_name, widget)
+                elif section_name == "processing":
+                    self._connect_widgets_to_machine(widgets, "processing")
+                elif section_name in output_sections:
+                    self._connect_widgets_to_machine(widgets, f"output.{section_name}")
 
         layout.addStretch()
 
@@ -1847,6 +1783,23 @@ class MachineEditorDialog(QtGui.QDialog):
 
                 value = OutputUnits.METRIC if value == "metric" else OutputUnits.IMPERIAL
             setattr(self.machine.output, field_name, value)
+
+    def _connect_main_output_widget(self, field_name, widget):
+        """Connect a main-section output widget to _on_output_field_changed.
+
+        The shared layout builder creates these widgets but does not connect
+        them to any model — that is the caller's responsibility.
+        """
+        if isinstance(widget, QtGui.QCheckBox):
+            widget.toggled.connect(
+                lambda checked, fn=field_name: self._on_output_field_changed(fn, checked)
+            )
+        elif isinstance(widget, QtGui.QComboBox):
+            widget.currentIndexChanged.connect(
+                lambda idx, w=widget, fn=field_name: self._on_output_field_changed(
+                    fn, w.itemData(idx)
+                )
+            )
 
     def setup_postprocessor_tab(self):
         """Set up the postprocessor configuration tab with selector and properties."""
@@ -1908,28 +1861,6 @@ class MachineEditorDialog(QtGui.QDialog):
         self.post_properties_widgets = {}  # Store widgets for property access
         self.post_properties_group.setVisible(False)  # Hidden until postprocessor selected
         layout.addWidget(self.post_properties_group)
-
-        layout.addStretch()
-
-    def setup_processing_tab(self):
-        """Set up the processing options configuration tab."""
-        # Use scroll area for all the options
-        scroll = QtGui.QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll_widget = QtGui.QWidget()
-        layout = QtGui.QVBoxLayout(scroll_widget)
-        scroll.setWidget(scroll_widget)
-
-        main_layout = QtGui.QVBoxLayout(self.processing_tab)
-        main_layout.addWidget(scroll)
-
-        # === Processing Options ===
-        if self.machine:
-            processing_group, processing_widgets = DataclassGUIGenerator.create_group_for_dataclass(
-                self.machine.processing, "Processing Options"
-            )
-            layout.addWidget(processing_group)
-            self._connect_widgets_to_machine(processing_widgets, "processing")
 
         layout.addStretch()
 

@@ -191,7 +191,11 @@ class PostProcessDialog:
         self._rebuild_machine_output_section()
 
     def _rebuild_machine_output_section(self):
-        """Clear and rebuild the dynamic machine-output option groups in the Output tab."""
+        """Clear and rebuild the dynamic machine-output option groups in the Output tab.
+
+        Uses the shared ``build_output_options`` helper so the layout stays
+        consistent with the Machine Editor dialog.
+        """
         dlg = self.dialog
         scroll_layout = dlg.scrollContentsOutput.layout()
 
@@ -222,76 +226,35 @@ class PostProcessDialog:
             return
 
         try:
-            from Machine.ui.editor.machine_editor import DataclassGUIGenerator
+            from Machine.ui.editor.output_options_layout import build_output_options
         except Exception as e:
-            Path.Log.warning(f"Could not import DataclassGUIGenerator: {e}")
+            Path.Log.warning(f"Could not import build_output_options: {e}")
             self._rebuild_post_params_section(machine)
             return
 
-        # Insertion point: append before the last item (spacer) in the scroll area
+        # Build all output + processing widgets into a temporary container,
+        # then transplant each top-level group into the scroll layout.
+        container = QtGui.QWidget()
+        container_layout = QtGui.QVBoxLayout(container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+
+        section_widgets = build_output_options(machine, container_layout, context="CAM_Post")
+
+        # Flatten section_widgets into _machine_output_field_widgets
+        self._machine_output_field_widgets = dict(section_widgets)
+
+        # Move the generated group boxes from the container into the real
+        # scroll layout (inserted before the trailing spacer).
         insert_idx = max(0, scroll_layout.count() - 1)
+        while container_layout.count():
+            item = container_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                scroll_layout.insertWidget(insert_idx, widget)
+                self._dynamic_output_groups.append(widget)
+                insert_idx += 1
 
-        # --- Main output options (units + top-level booleans) ---
-        main_group = QtGui.QGroupBox(translate("CAM_Post", "Main Options"))
-        main_layout = QtGui.QFormLayout(main_group)
-
-        units_combo = QtGui.QComboBox()
-        units_combo.addItem(translate("CAM_Post", "Metric"), "metric")
-        units_combo.addItem(translate("CAM_Post", "Imperial"), "imperial")
-        try:
-            units_val = machine.output.units.value
-            idx = units_combo.findData(units_val)
-            if idx >= 0:
-                units_combo.setCurrentIndex(idx)
-        except Exception:
-            pass
-        main_layout.addRow(translate("CAM_Post", "Units"), units_combo)
-        units_combo.value_getter = lambda: units_combo.itemData(units_combo.currentIndex())
-
-        main_widgets = {"units": units_combo}
-        for field_name, label in [
-            ("output_header", translate("CAM_Post", "Output Header")),
-            ("output_tool_length_offset", translate("CAM_Post", "Output Tool Length Offset (G43)")),
-            ("remote_post", translate("CAM_Post", "Enable Remote Posting")),
-        ]:
-            cb = QtGui.QCheckBox()
-            cb.setChecked(bool(getattr(getattr(machine, "output", None), field_name, False)))
-            cb.value_getter = lambda w=cb: w.isChecked()
-            main_layout.addRow(label, cb)
-            main_widgets[field_name] = cb
-
-        scroll_layout.insertWidget(insert_idx, main_group)
-        self._dynamic_output_groups.append(main_group)
-        self._machine_output_field_widgets["main"] = main_widgets
-        insert_idx += 1
-
-        # --- Sub-dataclass groups ---
-        output = getattr(machine, "output", None)
-        if output is None:
-            return
-
-        sub_sections = [
-            ("header", translate("CAM_Post", "Header Options")),
-            ("comments", translate("CAM_Post", "Comment Options")),
-            ("formatting", translate("CAM_Post", "Formatting Options")),
-            ("precision", translate("CAM_Post", "Precision Options")),
-            ("duplicates", translate("CAM_Post", "Duplicate Output Options")),
-        ]
-        for attr_name, title in sub_sections:
-            dc_instance = getattr(output, attr_name, None)
-            if dc_instance is None:
-                continue
-            try:
-                group, widgets = DataclassGUIGenerator.create_group_for_dataclass(
-                    dc_instance, title
-                )
-            except Exception as e:
-                Path.Log.warning(f"Could not build group for {attr_name}: {e}")
-                continue
-            scroll_layout.insertWidget(insert_idx, group)
-            self._dynamic_output_groups.append(group)
-            self._machine_output_field_widgets[attr_name] = widgets
-            insert_idx += 1
+        container.deleteLater()
 
         # Populate non-runtime post-processor config on this (Options) tab
         self._rebuild_post_config_section(machine, scroll_layout, insert_idx)
@@ -966,6 +929,14 @@ class PostProcessDialog:
 
             elif section in ("header", "comments", "formatting", "precision", "duplicates"):
                 sub = getattr(machine.output, section, None)
+                if sub is None:
+                    continue
+                for field_name, widget in widgets.items():
+                    if hasattr(widget, "value_getter") and hasattr(sub, field_name):
+                        setattr(sub, field_name, widget.value_getter())
+
+            elif section == "processing":
+                sub = getattr(machine, "processing", None)
                 if sub is None:
                     continue
                 for field_name, widget in widgets.items():
