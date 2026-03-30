@@ -1136,6 +1136,8 @@ PyObject* ApplicationPy::sActivateWorkbenchHandler(PyObject* /*self*/, PyObject*
         return nullptr;
     }
 
+    requirePythonMainThread("FreeCADGui.activateWorkbench");
+
     // search for workbench handler from the dictionary
     PyObject* pcWorkbench = PyDict_GetItemString(Application::Instance->_pcWorkbenchDictionary, psKey);
     if (!pcWorkbench) {
@@ -1446,6 +1448,8 @@ PyObject* ApplicationPy::sAddCommand(PyObject* /*self*/, PyObject* args)
         return nullptr;
     }
 
+    requirePythonMainThread("FreeCADGui.addCommand");
+
     // get the call stack to find the Python module name
     //
     std::string module;
@@ -1543,6 +1547,8 @@ PyObject* ApplicationPy::sRunCommand(PyObject* /*self*/, PyObject* args)
         return nullptr;
     }
 
+    requirePythonMainThread("FreeCADGui.runCommand");
+
     Gui::Command::LogDisabler d1;
     Gui::SelectionLogDisabler d2;
 
@@ -1562,6 +1568,8 @@ PyObject* ApplicationPy::sDoCommand(PyObject* /*self*/, PyObject* args)
     if (!PyArg_ParseTuple(args, "s", &sCmd)) {
         return nullptr;
     }
+
+    requirePythonMainThread("FreeCADGui.doCommand");
 
     Gui::Command::LogDisabler d1;
     Gui::SelectionLogDisabler d2;
@@ -1593,6 +1601,8 @@ PyObject* ApplicationPy::sDoCommandGui(PyObject* /*self*/, PyObject* args)
         return nullptr;
     }
 
+    requirePythonMainThread("FreeCADGui.doCommandGui");
+
     Gui::Command::LogDisabler d1;
     Gui::SelectionLogDisabler d2;
 
@@ -1623,6 +1633,8 @@ PyObject* ApplicationPy::sDoCommandEval(PyObject* /*self*/, PyObject* args)
         return nullptr;
     }
 
+    requirePythonMainThread("FreeCADGui.doCommandEval");
+
     Gui::Command::LogDisabler d1;
     Gui::SelectionLogDisabler d2;
 
@@ -1649,6 +1661,8 @@ PyObject* ApplicationPy::sDoCommandSkip(PyObject* /*self*/, PyObject* args)
     if (!PyArg_ParseTuple(args, "s", &sCmd)) {
         return nullptr;
     }
+
+    requirePythonMainThread("FreeCADGui.doCommandSkip");
 
     Gui::Command::LogDisabler d1;
     Gui::SelectionLogDisabler d2;
