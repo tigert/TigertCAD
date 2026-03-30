@@ -35,8 +35,6 @@
 #include <QMessageBox>
 #include <QOpenGLWidget>
 #include <QTextStream>
-#include <QTimer>
-#include <QThread>
 #include <QStatusBar>
 #include <Inventor/actions/SoSearchAction.h>
 #include <Inventor/nodes/SoSeparator.h>
