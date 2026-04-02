@@ -55,5 +55,4 @@ protected:
     unsigned int mTextureId = 0;
 };
 
-
 }  // namespace CAMSimulator
