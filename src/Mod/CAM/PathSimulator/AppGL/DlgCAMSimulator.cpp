@@ -40,6 +40,9 @@
 #include <QHBoxLayout>
 #include <QPointer>
 
+// include this last as the defines can mess up other includes
+#include "OpenGlWrapper.h"
+
 namespace CAMSimulator
 {
 
@@ -352,7 +355,7 @@ void DlgCAMSimulator::updateWindowScale()
 
 void DlgCAMSimulator::initializeGL()
 {
-    initializeOpenGLFunctions();
+    gOpenGLFunctions.initializeOpenGLFunctions();
 }
 
 void DlgCAMSimulator::paintGL()

@@ -26,6 +26,7 @@
 #include "Shader.h"
 #include <math.h>
 #include <cstddef>
+#include <numbers>
 #include <vector>
 
 // include this last as the defines can mess up other includes

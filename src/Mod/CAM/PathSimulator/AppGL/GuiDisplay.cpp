@@ -24,6 +24,7 @@
 
 #include "GuiDisplay.h"
 
+#include "DlgCAMSimulator.h"
 #include "GlUtils.h"
 #include "MillSimulation.h"
 #include <cstddef>

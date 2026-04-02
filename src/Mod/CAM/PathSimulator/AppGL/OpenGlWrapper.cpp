@@ -29,6 +29,8 @@
 namespace CAMSimulator
 {
 
+QOpenGLExtraFunctions gOpenGLFunctions;
+
 void GLClearError()
 {
     while (glGetError() != GL_NO_ERROR)
