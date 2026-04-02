@@ -23,7 +23,7 @@
  ***************************************************************************/
 
 #include "SolidObject.h"
-#include "Shader.h"
+
 #include <algorithm>
 
 #define NUM_PROFILE_POINTS 4
@@ -38,6 +38,11 @@ SolidObject::SolidObject()
 }
 
 SolidObject::~SolidObject()
+{
+    Clear();
+}
+
+void SolidObject::Clear()
 {
     isValid = false;
     shape.FreeResources();

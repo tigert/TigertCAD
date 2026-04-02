@@ -25,7 +25,6 @@
 #pragma once
 
 #include "SolidObject.h"
-#include "linmath.h"
 
 namespace CAMSimulator
 {

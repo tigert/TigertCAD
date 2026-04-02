@@ -22,14 +22,12 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <string>
-#include <vector>
-
 
 #include "CAMSim.h"
-#include "DlgCAMSimulator.h"
-#include <Mod/Part/App/BRepMesh.h>
 
+#include "DlgCAMSimulator.h"
+#include <string>
+#include <vector>
 
 using namespace Base;
 
@@ -43,9 +41,9 @@ void CAMSim::BeginSimulation(const Part::TopoShape& stock, float quality)
     DlgCAMSimulator::instance()->startSimulation(stock, quality);
 }
 
-void CAMSim::resetSimulation()
+void CAMSim::resetSimulation(Gui::Document* doc)
 {
-    DlgCAMSimulator::instance()->resetSimulation();
+    DlgCAMSimulator::instance()->resetSimulation(doc);
 }
 
 void CAMSim::addTool(
