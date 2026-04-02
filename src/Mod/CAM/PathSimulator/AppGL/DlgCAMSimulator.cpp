@@ -40,8 +40,6 @@
 #include <QHBoxLayout>
 #include <QPointer>
 
-using namespace MillSim;
-
 namespace CAMSimulator
 {
 
@@ -104,7 +102,7 @@ void DlgCAMSimulator::cloneFrom(const DlgCAMSimulator& from)
     mBase.needsUpdate = true;
 
     const auto state = from.mMillSimulator->GetState();
-    mState = std::make_unique<MillSim::MillSimulationState>(state);
+    mState = std::make_unique<MillSimulationState>(state);
 }
 
 DlgCAMSimulator* DlgCAMSimulator::instance()

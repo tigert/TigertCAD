@@ -26,7 +26,7 @@
 
 #include <iostream>
 
-namespace MillSim
+namespace CAMSimulator
 {
 
 void GLClearError()
@@ -45,4 +45,4 @@ bool GLLogError()
     return isError;
 }
 
-}  // namespace MillSim
+}  // namespace CAMSimulator

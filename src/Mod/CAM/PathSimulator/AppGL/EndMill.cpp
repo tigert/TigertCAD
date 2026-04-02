@@ -26,7 +26,8 @@
 
 #include "SimShapes.h"
 
-using namespace MillSim;
+namespace CAMSimulator
+{
 
 EndMill::EndMill(int toolid, float diameter)
 {
@@ -112,3 +113,5 @@ void EndMill::MirrorPointBuffer()
         profilePoints[j + 1] = profilePoints[i + 1];
     }
 }
+
+}  // namespace CAMSimulator

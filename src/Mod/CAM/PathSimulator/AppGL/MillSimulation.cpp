@@ -33,7 +33,7 @@
 
 #define DRAG_ZOOM_FACTOR 10
 
-namespace MillSim
+namespace CAMSimulator
 {
 
 MillSimulation::MillSimulation()
@@ -116,8 +116,7 @@ void MillSimulation::InitSimulation(float quality)
         mDestMotion = mCodeParser.Operations[i];
         EndMill* tool = GetTool(mDestMotion.tool);
         if (tool != nullptr) {
-            MillSim::MillPathSegment* segment
-                = new MillSim::MillPathSegment(tool, &mCurMotion, &mDestMotion);
+            MillPathSegment* segment = new MillPathSegment(tool, &mCurMotion, &mDestMotion);
             segment->indexInArray = i;
             segment->segmentIndex = segId++;
             mNTotalSteps += segment->numSimSteps;
@@ -239,7 +238,7 @@ void MillSimulation::GlsimEnd(void)
 
 void MillSimulation::renderSegmentForward(int iSeg)
 {
-    MillSim::MillPathSegment* p = MillPathSegments.at(iSeg);
+    MillPathSegment* p = MillPathSegments.at(iSeg);
     int step = iSeg == mPathStep ? mSubStep : p->numSimSteps;
     int start = p->isMultyPart ? 1 : step;
     for (int i = start; i <= step; i++) {
@@ -252,7 +251,7 @@ void MillSimulation::renderSegmentForward(int iSeg)
 
 void MillSimulation::renderSegmentReversed(int iSeg)
 {
-    MillSim::MillPathSegment* p = MillPathSegments.at(iSeg);
+    MillPathSegment* p = MillPathSegments.at(iSeg);
     int step = iSeg == mPathStep ? mSubStep : p->numSimSteps;
     int end = p->isMultyPart ? 1 : step;
     for (int i = step; i >= end; i--) {
@@ -267,7 +266,7 @@ void MillSimulation::CalcSegmentPositions()
 {
     mSubStep = mCurStep;
     for (mPathStep = 0; mPathStep < mNPathSteps; mPathStep++) {
-        MillSim::MillPathSegment* p = MillPathSegments[mPathStep];
+        MillPathSegment* p = MillPathSegments[mPathStep];
         if (mSubStep < p->numSimSteps) {
             break;
         }
@@ -323,7 +322,7 @@ void MillSimulation::RenderSimulation()
     simDisplay.StartGeometryPass(cutColor, true);
     GlsimRenderTools();
     for (int i = 0; i <= mPathStep; i++) {
-        MillSim::MillPathSegment* p = MillPathSegments.at(i);
+        MillPathSegment* p = MillPathSegments.at(i);
         int step = (i == mPathStep) ? mSubStep : p->numSimSteps;
         int start = p->isMultyPart ? 1 : step;
         for (int j = start; j <= step; j++) {
@@ -342,7 +341,7 @@ void MillSimulation::RenderTool()
 
     vec3 toolPos;
     MotionPosToVec(toolPos, &mDestMotion);
-    MillSim::MillPathSegment* p = MillPathSegments.at(mPathStep);
+    MillPathSegment* p = MillPathSegments.at(mPathStep);
     p->GetHeadPosition(toolPos);
     mat4x4 tmat;
     mat4x4_translate(tmat, toolPos[0], toolPos[1], toolPos[2]);
@@ -407,7 +406,7 @@ void MillSimulation::Render()
            mat4x4_translate_in_place(test, 20, 20, 3);
            mat4x4_rotate_Z(test, test, 30.f * 3.14f / 180.f);
            int dpos = mNPathSteps - mDebug2;
-           MillSim::MillPathSegment* p = MillPathSegments.at(dpos);
+           MillPathSegment* p = MillPathSegments.at(dpos);
            if (mDebug > p->numSimSteps) {
                mDebug = 1;
            }
@@ -725,4 +724,4 @@ const MillSimulationState& MillSimulation::GetState() const
     return *this;
 }
 
-}  // namespace MillSim
+}  // namespace CAMSimulator

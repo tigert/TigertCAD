@@ -34,7 +34,8 @@
 // include this last as the defines can mess up other includes
 #include "OpenGlWrapper.h"
 
-using namespace MillSim;
+namespace CAMSimulator
+{
 
 // clang-format off
 // NOLINTBEGIN(*-magic-numbers)
@@ -339,7 +340,7 @@ void GuiDisplay::MouseCursorPos(int x, int y)
     }
     if (mMouseOverItem != prevMouseOver) {
         if (mMouseOverItem != nullptr && !mMouseOverItem->toolTip.isEmpty()) {
-            const QWidget* w = CAMSimulator::DlgCAMSimulator::instance();
+            const QWidget* w = DlgCAMSimulator::instance();
             const float ratio = w->devicePixelRatioF();
             const QPoint pos(x / ratio, y / ratio);
             const QPoint globPos = w->mapToGlobal(pos);
@@ -479,3 +480,5 @@ void GuiDisplay::Render(float progress)
         RenderItem(i);
     }
 }
+
+}  // namespace CAMSimulator

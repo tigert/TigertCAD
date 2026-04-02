@@ -35,7 +35,8 @@
 #include "CAMSimPy.cpp"
 
 
-using namespace CAMSimulator;
+namespace CAMSimulator
+{
 
 // returns a string which represents the object e.g. when printed in python
 std::string CAMSimPy::representation() const
@@ -173,3 +174,5 @@ int CAMSimPy::setCustomAttributes(const char* /*attr*/, PyObject* /*obj*/)
 {
     return 0;
 }
+
+}  // namespace CAMSimulator

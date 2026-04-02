@@ -31,7 +31,9 @@
 // include this last as the defines can mess up other includes
 #include "OpenGlWrapper.h"
 
-using namespace MillSim;
+namespace CAMSimulator
+{
+
 using std::numbers::pi;
 
 int Shape::lastNumSlices = 0;
@@ -384,3 +386,5 @@ Shape::~Shape()
 {
     FreeResources();
 }
+
+}  // namespace CAMSimulator

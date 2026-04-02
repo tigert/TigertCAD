@@ -38,7 +38,7 @@
 // include this last as the defines can mess up other includes
 #include "OpenGlWrapper.h"
 
-namespace MillSim
+namespace CAMSimulator
 {
 
 void SimDisplay::InitShaders()
@@ -604,4 +604,4 @@ float SimDisplay::GetEyeFactor()
     return mEyeDistFactor;
 }
 
-}  // namespace MillSim
+}  // namespace CAMSimulator

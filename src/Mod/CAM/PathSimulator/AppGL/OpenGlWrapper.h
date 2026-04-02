@@ -118,10 +118,10 @@
 #define GLDELETE_RENDERBUFFER(x) GLDELETE(Renderbuffers, x)
 #define GLDELETE_BUFFER(x) GLDELETE(Buffers, x)
 
-namespace MillSim
+namespace CAMSimulator
 {
 
 void GLClearError();
 bool GLLogError();
 
-}  // namespace MillSim
+}  // namespace CAMSimulator

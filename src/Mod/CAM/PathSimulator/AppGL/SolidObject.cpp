@@ -27,7 +27,9 @@
 #include <algorithm>
 
 #define NUM_PROFILE_POINTS 4
-using namespace MillSim;
+
+namespace CAMSimulator
+{
 
 SolidObject::SolidObject()
 {
@@ -41,7 +43,7 @@ SolidObject::~SolidObject()
     shape.FreeResources();
 }
 
-void MillSim::SolidObject::SetPosition(vec3 position)
+void SolidObject::SetPosition(vec3 position)
 {
     mat4x4_translate(mModelMat, position[0], position[1], position[2]);
 }
@@ -78,3 +80,5 @@ void SolidObject::GenerateSolid(const std::vector<Vertex>& verts, const std::vec
     vec3_set(size, l, w, h);
     isValid = true;
 }
+
+}  // namespace CAMSimulator

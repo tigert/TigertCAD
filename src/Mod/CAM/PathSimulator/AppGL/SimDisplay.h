@@ -32,7 +32,7 @@
 #include <algorithm>
 #include <numbers>
 
-namespace MillSim
+namespace CAMSimulator
 {
 
 constexpr auto pi = std::numbers::pi_v<float>;
@@ -140,4 +140,4 @@ protected:
     unsigned int mFboRandTexture = 0;
 };
 
-}  // namespace MillSim
+}  // namespace CAMSimulator
