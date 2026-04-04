@@ -255,7 +255,9 @@ public:
     App::MainThreadSignal<void(const Document&, const std::string&)> signalFinishSave;
     /// Signal before recomputing the document.
     App::MainThreadSignal<void(const Document&)> signalBeforeRecompute;
-    /// Signal after recomputing the document.
+    /// Signal after recomputing the document but before the document is fully
+    /// stable again. Observers that require a fully stable post-recompute
+    /// state should wait for signalBecameStable().
     App::MainThreadSignal<void(const Document&, const std::vector<DocumentObject*>&)> signalRecomputed;
     /// Signal after recomputing an object.
     App::MainThreadSignal<void(const DocumentObject&)> signalRecomputedObject;
@@ -265,6 +267,9 @@ public:
     App::MainThreadSignal<void(const Document&)> signalCommitTransaction;
     /// Signal on an aborted transaction.
     App::MainThreadSignal<void(const Document&)> signalAbortTransaction;
+    /// Signal after document recompute/transaction state has fully unwound and
+    /// observers may treat the document as stable again.
+    App::MainThreadSignal<void(const Document&)> signalBecameStable;
     /// Signal on a skipping a recompute.
     App::MainThreadSignal<void(const Document&, const std::vector<DocumentObject*>&)> signalSkipRecompute;
     /// Signal on finishing restoring an object.
@@ -301,6 +306,16 @@ public:
      * @param[in] file: The file name to save the copy to.
      */
     bool saveCopy(const char* file) const;
+
+    /**
+     * @brief Return whether App-side document state allows a recovery write.
+     *
+     * This intentionally does not account for GUI-only concerns such as an
+     * active Gui transaction. Callers in Gui can combine this with their own
+     * additional checks. App-side transaction scopes are tracked explicitly so
+     * this does not depend on undo state being enabled.
+     */
+    bool canWriteRecoverySnapshot() const;
 
     /**
      * @brief Restore the document from the file in Property Path.
