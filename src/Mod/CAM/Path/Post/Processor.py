@@ -2312,7 +2312,12 @@ class PostProcessor:
 
         This method can be overridden by derived postprocessors to customize tool change handling.
         """
-        return self._convert_move(command)
+        result = self._convert_move(command)
+        # Reset modal state after tool change so that subsequent commands
+        # (M3 S..., G4 P..., G0 X... etc.) are not suppressed as duplicates.
+        for key in self._modal_state:
+            self._modal_state[key] = None
+        return result
 
     def _convert_spindle_command(self, command: Path.Command) -> str:
         """
