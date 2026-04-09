@@ -2258,10 +2258,10 @@ class PostProcessor:
                     # Update modal state for unhandled parameters too
                     self._modal_state[parameter] = params[parameter]
 
-        # Suppress move commands that have no parameters after formatting.
-        # This happens when axis parameters are excluded from parameter_order
-        # (e.g., Z suppression for wire EDM) leaving a bare G0/G1/G2/G3.
-        if len(command_line) == 1 and command_name in Constants.GCODE_MOVE_ALL:
+        # Suppress commands where all parameters were removed by duplicate suppression
+        # or parameter_order exclusion (e.g., Z suppression for wire EDM).
+        # A bare move (G0, G1, G2, G3) or dwell (G4) with no parameters is meaningless.
+        if params and len(command_line) == 1:
             return None
 
         # Handle tool length offset (G43) suppression

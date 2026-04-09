@@ -1618,6 +1618,39 @@ class TestExport2Integration(unittest.TestCase):
                 suppressed_count, 3, f"Should have 3 suppressed G1 moves, found {suppressed_count}"
             )
 
+    def test128b_bare_command_suppressed_when_all_params_duplicate(self):
+        """
+        Test that a command is fully suppressed when all its parameters are
+        duplicates, rather than emitting a bare command name.
+
+        Expected:
+            G0 X10 Y10 Z5     <- first move, all params output
+            G0 X10 Y10 Z5     <- identical, ALL params suppressed -> entire line dropped
+        """
+        machine = self._create_machine(
+            parameters=False, line_numbers=False, comments_enabled=False, output_header=False
+        )
+
+        with self._modify_operation_path(
+            [
+                Path.Command("G0", {"X": 10.0, "Y": 10.0, "Z": 5.0}),
+                Path.Command("G0", {"X": 10.0, "Y": 10.0, "Z": 5.0}),
+            ]
+        ):
+            results = self._run_export2(machine)
+            gcode = self._get_first_section_gcode(results)
+            lines = [
+                l.strip() for l in gcode.split("\n") if l.strip() and not l.strip().startswith("(")
+            ]
+
+            # There should be no bare "G0" line (command with no parameters)
+            bare_g0 = [l for l in lines if l == "G0"]
+            self.assertEqual(
+                len(bare_g0),
+                0,
+                f"Bare G0 with no parameters should be suppressed, found: {bare_g0}",
+            )
+
     def test130_modal_state_reset_after_tool_change(self):
         """
         Test that modal state resets after tool change so parameters are not
