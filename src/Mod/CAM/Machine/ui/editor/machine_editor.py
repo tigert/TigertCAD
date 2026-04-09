@@ -779,8 +779,8 @@ class MachineEditorDialog(QtGui.QDialog):
         Args:
             index: Index of the tab/toolhead to remove
         """
-        if not self.machine or len(self.machine.toolheads) <= 1:
-            return  # Don't allow removing the last toolhead
+        if not self.machine or len(self.machine.toolheads) == 0:
+            return  # Nothing to remove
 
         reply = QtGui.QMessageBox.question(
             self,
@@ -1157,25 +1157,19 @@ class MachineEditorDialog(QtGui.QDialog):
         self.toolheads_group = QtGui.QGroupBox(translate("CAM_MachineEditor", "Toolheads"))
         toolheads_layout = QtGui.QVBoxLayout(self.toolheads_group)
 
+        # Button bar for toolhead actions
+        button_bar = QtGui.QHBoxLayout()
+        button_bar.addStretch()
+        self.add_toolhead_button = QtGui.QPushButton(translate("CAM_MachineEditor", "Add Toolhead"))
+        self.add_toolhead_button.setToolTip(translate("CAM_MachineEditor", "Add Toolhead"))
+        self.add_toolhead_button.clicked.connect(self._add_toolhead)
+        self.add_toolhead_button.setEnabled(True)
+        button_bar.addWidget(self.add_toolhead_button)
+        toolheads_layout.addLayout(button_bar)
+
         self.toolheads_tabs = QtGui.QTabWidget()
         self.toolheads_tabs.setTabsClosable(True)
         self.toolheads_tabs.tabCloseRequested.connect(self._remove_toolhead)
-
-        # Add + button to the tab bar corner, vertically centered
-        corner_container = QtGui.QWidget()
-        corner_container_layout = QtGui.QVBoxLayout(corner_container)
-        corner_container_layout.setContentsMargins(0, 0, 0, 0)
-        corner_container_layout.setSpacing(0)
-        corner_container_layout.addStretch()
-        self.add_toolhead_button = QtGui.QPushButton("+")
-        self.add_toolhead_button.setToolTip(translate("CAM_MachineEditor", "Add Toolhead"))
-        self.add_toolhead_button.clicked.connect(self._add_toolhead)
-        self.add_toolhead_button.setSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
-        # Ensure button is initially enabled
-        self.add_toolhead_button.setEnabled(True)
-        corner_container_layout.addWidget(self.add_toolhead_button, 0, QtCore.Qt.AlignCenter)
-        corner_container_layout.addStretch()
-        self.toolheads_tabs.setCornerWidget(corner_container, QtCore.Qt.TopRightCorner)
 
         toolheads_layout.addWidget(self.toolheads_tabs)
         layout.addRow(self.toolheads_group)
@@ -1642,33 +1636,10 @@ class MachineEditorDialog(QtGui.QDialog):
             self.toolheads_tabs.removeTab(0)
 
         self.toolhead_edits = []
-        count = len(self.machine.toolheads) if self.machine else 1
-        Path.Log.debug(f"Target toolhead count: {count}")
+        count = len(self.machine.toolheads) if self.machine else 0
+        Path.Log.debug(f"Toolhead count: {count}")
 
-        # Ensure machine has at least 1 toolhead
-        if self.machine:
-            # Always ensure at least 1 toolhead, even if current count is 0
-            target_count = max(count, 1)
-            Path.Log.debug(f"Target count after max(count, 1): {target_count}")
-            while len(self.machine.toolheads) < target_count:
-                Path.Log.debug(f"Adding toolhead, current count: {len(self.machine.toolheads)}")
-                self.machine.toolheads.append(
-                    Toolhead(
-                        name=f"Toolhead {len(self.machine.toolheads) + 1}",
-                        toolhead_type=ToolheadType.ROTARY,
-                        id=f"toolhead{len(self.machine.toolheads) + 1}",
-                        max_power_kw=3.0,
-                        max_rpm=24000,
-                        min_rpm=6000,
-                        tool_change="manual",
-                    )
-                )
-            while len(self.machine.toolheads) > count:
-                self.machine.toolheads.pop()
-
-            Path.Log.debug(f"After toolhead adjustment, count: {len(self.machine.toolheads)}")
-
-        for i in range(max(count, 1)):
+        for i in range(count):
             tab = QtGui.QWidget()
             layout = QtGui.QFormLayout(tab)
 
