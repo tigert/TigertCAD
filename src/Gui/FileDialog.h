@@ -61,6 +61,38 @@ class GuiExport FileDialog: public QFileDialog
     Q_OBJECT
 
 public:
+    /**
+     * File name filter specification for narrowing down the choice of
+     * files in open/save dialogs.
+     */
+    struct GuiExport Filter
+    {
+        /** Text displayed for this filter. Translatable. */
+        QString name;
+
+        /**
+         * List of patterns matched by this filter. Note that extensions are
+         * just a subset of patterns in the form of "*.ext".
+         * For example, `{"*.so", "*.exe", "*.dyld", "a.out"}`.
+         */
+        QStringList patterns;
+
+        /**
+         * Create a filter from its string form.
+         * These take the form of `Filter name (*.ext1 *.ext2)`.
+         */
+        static Filter fromFilterString(const QString& filter);
+
+        bool operator==(const Filter& rhs) const
+        {
+            return name == rhs.name && patterns == rhs.patterns;
+        }
+
+        /** Checks if the filter is a full wildcard, i.e. accepts "*" or "*.*". */
+        bool isWildcard() const;
+    };
+    using FilterList = QList<Filter>;
+
     static QString getOpenFileName(
         QWidget* parent = nullptr,
         const QString& caption = QString(),

@@ -294,119 +294,104 @@ static bool getPreferShowFilterPatterns()
     return group->GetBool("ShowFilterPatterns", show);
 }
 
-struct FilterSpec
+FileDialog::Filter FileDialog::Filter::fromFilterString(const QString& filter)
 {
-    QString name;
-    /// List of patterns matched by this filter. Note that extensions are
-    /// just a subset of patterns in the form of "*.ext".
-    QStringList patterns;
+    const auto start = filter.lastIndexOf(QLatin1Char('('));
+    const auto end = filter.lastIndexOf(QLatin1Char(')'));
+    const auto name = filter.left(start).trimmed();
+    const auto patternsPart = filter.mid(start + 1, end - start - 1);
+    return {name, patternsPart.split(QLatin1Char(' '), Qt::SkipEmptyParts)};
+}
 
-    bool operator==(const FilterSpec& rhs) const
-    {
-        return name == rhs.name && patterns == rhs.patterns;
-    }
-
-    static FilterSpec fromFilterString(const QString& filter)
-    {
-        const auto start = filter.lastIndexOf(QLatin1Char('('));
-        const auto end = filter.lastIndexOf(QLatin1Char(')'));
-        const auto name = filter.left(start).trimmed();
-        const auto patternsPart = filter.mid(start + 1, end - start - 1);
-        return {name, patternsPart.split(QLatin1Char(' '), Qt::SkipEmptyParts)};
-    }
-
-    QString getDisplayName(bool showPatterns) const
-    {
-        // Avoid overflowing the screen with an excessively long filter list (see #23139).
-        const qsizetype MaxFiltersLength = 128;
-        const qsizetype TypicalMaxPatternLength = 12;
-
-        if (!showPatterns) {
-            return name;
-        }
-
-        QString formatted(name);
-        formatted += QLatin1Char(' ');
-
-        // Deduplicate the patterns which usually come in both uppercase and lowercase variants.
-        // Keeps the first case encountered for a given pattern set.
-        // O(n^2) in complexity but the pattern lists are usually short.
-        QList<QStringView> seen;
-        seen.reserve(patterns.size());
-        const auto wasSeen = [&seen](QStringView pat) -> bool {
-            for (QStringView patSeen : seen) {
-                if (patSeen.compare(pat, Qt::CaseInsensitive) == 0) {
-                    return true;
-                }
-            }
-            return false;
-        };
-        QString dedupPatterns;
-        dedupPatterns.reserve(patterns.length() * TypicalMaxPatternLength);
-        for (auto it = patterns.cbegin(); it != patterns.cend(); ++it) {
-            if (!wasSeen(*it)) {
-                seen.append(*it);
-                if (it != patterns.cbegin()) {
-                    dedupPatterns += QLatin1Char(' ');
-                }
-                dedupPatterns += *it;
-            }
-        }
-
-        if (dedupPatterns.size() <= MaxFiltersLength) {
-            formatted += QLatin1Char('(');
-            formatted += dedupPatterns;
-            formatted += QLatin1Char(')');
-        }
-
-        return formatted;
-    }
-
-    QString toQtFilter(bool showPatterns) const
-    {
-        return getDisplayName(showPatterns) + QStringLiteral(" (") + patterns.join(QLatin1Char(' '))
-            + QLatin1Char(')');
-    }
-
-    /// @returns Whether the filter is a full wildcard (i.e. accepts "*" or "*.*")
-    bool isWildcard() const
-    {
-        for (const auto& pat : patterns) {
-            if (pat != "*" || pat != "*.*") {
-                return false;
-            }
-        }
-        return true;
-    }
-};
-
-class FilterSpecList: public QList<FilterSpec>
+bool FileDialog::Filter::isWildcard() const
 {
-public:
-    static FilterSpecList fromFilterStringList(const QStringList& filterStringList)
-    {
-        FilterSpecList specs;
-        specs.reserve(filterStringList.length());
-        for (const auto& filterString : filterStringList) {
-            specs += FilterSpec::fromFilterString(filterString);
+    for (const auto& pat : patterns) {
+        if (pat == "*" || pat == "*.*") {
+            return true;
         }
-        return specs;
+    }
+    return false;
+}
+
+static QString getFilterDisplayName(const FileDialog::Filter& filter, bool showPatterns)
+{
+    // Avoid overflowing the screen with an excessively long filter list (see #23139).
+    const qsizetype MaxFiltersLength = 128;
+    const qsizetype TypicalMaxPatternLength = 12;
+
+    if (!showPatterns) {
+        return filter.name;
     }
 
-    QStringList toQtFilterList(bool showPatterns) const
-    {
-        QStringList qtFilters;
-        for (const auto& filterSpec : *this) {
-            qtFilters += filterSpec.toQtFilter(showPatterns);
+    QString formatted(filter.name);
+    formatted += QLatin1Char(' ');
+
+    // Deduplicate the patterns which usually come in both uppercase and lowercase variants.
+    // Keeps the first case encountered for a given pattern set.
+    // O(n^2) in complexity but the pattern lists are usually short.
+    QList<QStringView> seen;
+    seen.reserve(filter.patterns.size());
+    const auto wasSeen = [&seen](QStringView pat) -> bool {
+        for (QStringView patSeen : seen) {
+            if (patSeen.compare(pat, Qt::CaseInsensitive) == 0) {
+                return true;
+            }
         }
-        return qtFilters;
+        return false;
+    };
+    QString dedupPatterns;
+    dedupPatterns.reserve(filter.patterns.length() * TypicalMaxPatternLength);
+    for (auto it = filter.patterns.cbegin(); it != filter.patterns.cend(); ++it) {
+        if (!wasSeen(*it)) {
+            seen.append(*it);
+            if (it != filter.patterns.cbegin()) {
+                dedupPatterns += QLatin1Char(' ');
+            }
+            dedupPatterns += *it;
+        }
     }
 
-    qsizetype indexOfFilterString(const QString& filterString) const
-    {
-        return indexOf(FilterSpec::fromFilterString(filterString));
+    if (dedupPatterns.size() <= MaxFiltersLength) {
+        formatted += QLatin1Char('(');
+        formatted += dedupPatterns;
+        formatted += QLatin1Char(')');
     }
-};
+
+    return formatted;
+}
+
+static QString toQtFilter(const FileDialog::Filter& filter, bool showPatterns)
+{
+    return getFilterDisplayName(filter, showPatterns) + QStringLiteral(" (")
+        + filter.patterns.join(QLatin1Char(' ')) + QLatin1Char(')');
+}
+
+// This function is intentionally not exposed as code using `FilterList`s
+// should be using them natively as intended, not converted from strings
+// at the last minute.
+static FileDialog::FilterList filterListFromStringList(const QStringList& filterStringList)
+{
+    FileDialog::FilterList filters;
+    filters.reserve(filterStringList.length());
+    for (const auto& filterString : filterStringList) {
+        filters += FileDialog::Filter::fromFilterString(filterString);
+    }
+    return filters;
+}
+
+QStringList toQtFilterList(const FileDialog::FilterList& filterList, bool showPatterns)
+{
+    QStringList qtFilters;
+    for (const auto& filter : filterList) {
+        qtFilters += toQtFilter(filter, showPatterns);
+    }
+    return qtFilters;
+}
+
+qsizetype indexOfFilterString(const FileDialog::FilterList& filterList, const QString& filterString)
+{
+    return filterList.indexOf(FileDialog::Filter::fromFilterString(filterString));
+}
 
 enum class NativeFileDialogMode
 {
@@ -435,8 +420,8 @@ static QStringList nativeFileDialog(
     NativeFileDialogMode mode,
     QWidget* parent,
     const QString& caption,
-    QString& dir,
-    const FilterSpecList& filterSpecs,
+    const QString& dir,
+    const FileDialog::FilterList& filters,
     qsizetype* selectedFilterIndex,
     FileDialog::Options options
 )
@@ -451,10 +436,10 @@ static QStringList nativeFileDialog(
     }
 
     QString flatFilter;
-    for (const auto& filterSpec : filterSpecs) {
-        flatFilter += filterSpec.getDisplayName(showPatterns);
+    for (const auto& filter : filters) {
+        flatFilter += getFilterDisplayName(filter, showPatterns);
         flatFilter += QLatin1Char('\0');
-        flatFilter += filterSpec.patterns.join(QLatin1Char(';'));
+        flatFilter += filter.patterns.join(QLatin1Char(';'));
         flatFilter += QLatin1Char('\0');
     }
     flatFilter += QLatin1Char('\0');
@@ -521,14 +506,14 @@ static QStringList nativeFileDialog(
     NativeFileDialogMode mode,
     QWidget* parent,
     const QString& caption,
-    QString& dir,
-    const FilterSpecList& filterSpecs,
+    const QString& dir,
+    const FileDialog::FilterList& filters,
     qsizetype* selectedFilterIndex,
     FileDialog::Options options
 )
 {
     const bool showPatterns = getPreferShowFilterPatterns();
-    const auto qtFilterList = filterSpecs.toQtFilterList(showPatterns);
+    const auto qtFilterList = toQtFilterList(filters, showPatterns);
     QString selectedQtFilter = (selectedFilterIndex != nullptr && *selectedFilterIndex >= 0)
         ? qtFilterList[*selectedFilterIndex]
         : "";
@@ -574,10 +559,10 @@ static QStringList nativeFileDialog(
  * Modifies a path obtained as a result of a save file dialog to ensure the file
  * name matches the selected file filter.
  */
-static void normalizeSavePath(QString& path, const FilterSpec& selectedFilterSpec)
+static void normalizeSavePath(QString& path, const FileDialog::Filter& selectedFilter)
 {
     // Wildcards have no rule by definition.
-    if (selectedFilterSpec.isWildcard()) {
+    if (selectedFilter.isWildcard()) {
         return;
     }
 
@@ -604,7 +589,7 @@ static void normalizeSavePath(QString& path, const FilterSpec& selectedFilterSpe
     const auto typedName = QStringView(path).mid(path.lastIndexOf('/') + 1);
 
     // Check for any full-name filters first.
-    for (const auto& pat : selectedFilterSpec.patterns) {
+    for (const auto& pat : selectedFilter.patterns) {
         if (!pat.startsWith("*.") && typedName == pat) {
             return;
         }
@@ -624,7 +609,7 @@ static void normalizeSavePath(QString& path, const FilterSpec& selectedFilterSpe
         path.chop(1);
     }
     else /* size() > 1 */ {
-        for (const auto& pat : selectedFilterSpec.patterns) {
+        for (const auto& pat : selectedFilter.patterns) {
             if (pat.startsWith("*.") && typedExt == QStringView(pat).mid(1)) {
                 // Valid extension found for the selected filter.
                 return;
@@ -633,7 +618,7 @@ static void normalizeSavePath(QString& path, const FilterSpec& selectedFilterSpe
     }
 
     // Append extension from first *.xyz-style pattern.
-    for (const auto& pat : selectedFilterSpec.patterns) {
+    for (const auto& pat : selectedFilter.patterns) {
         if (pat.startsWith("*.")) {
             path.append(QStringView(pat).mid(1));
             break;
@@ -644,13 +629,13 @@ static void normalizeSavePath(QString& path, const FilterSpec& selectedFilterSpe
 #ifndef NDEBUG
 static void testNormalizeSavePath()
 {
-    const auto spec = FilterSpec::fromFilterString(
+    const auto filt = Filter::fromFilterString(
         QStringLiteral("Whatever files (what ev.er *.abc *.xyz)")
     );
-    const auto nspEq = [spec](QString path, const QString& desired) -> bool {
-        normalizeSavePath(path, spec);
+    const auto nspEq = [filt](QString path, const QString& desired) -> bool {
+        normalizeSavePath(path, filt);
         const auto firstPassResult = path;
-        normalizeSavePath(path, spec);
+        normalizeSavePath(path, filt);
         const bool idempotent = firstPassResult == path;
         return idempotent && path == desired;
     };
@@ -770,9 +755,9 @@ QString FileDialog::getSaveFileName(
         windowTitle = FileDialog::tr("Save As");
     }
 
-    const auto filterSpecList = FilterSpecList::fromFilterStringList(filters);
+    const auto filterList = filterListFromStringList(filters);
     qsizetype selectedFilterIndex = (selectedFilter != nullptr && !selectedFilter->isEmpty())
-        ? filterSpecList.indexOfFilterString(*selectedFilter)
+        ? indexOfFilterString(filterList, *selectedFilter)
         : -1;
 
     options |= QFileDialog::HideNameFilterDetails;
@@ -783,7 +768,7 @@ QString FileDialog::getSaveFileName(
     QString file;
     if (DialogOptions::dontUseNativeFileDialog()) {
         const bool showPatterns = getPreferShowFilterPatterns();
-        const auto qtFilterList = filterSpecList.toQtFilterList(showPatterns);
+        const auto qtFilterList = toQtFilterList(filterList, showPatterns);
         QList<QUrl> urls = fetchSidebarUrls();
 
         options |= QFileDialog::DontUseNativeDialog;
@@ -802,7 +787,7 @@ QString FileDialog::getSaveFileName(
         }
         dlg.setNameFilters(qtFilterList);
         if (selectedFilterIndex >= 0) {
-            dlg.selectNameFilter(filterSpecList[selectedFilterIndex].toQtFilter(showPatterns));
+            dlg.selectNameFilter(toQtFilter(filterList[selectedFilterIndex], showPatterns));
         }
         dlg.onSelectedFilter(dlg.selectedNameFilter());
         dlg.setOption(QFileDialog::DontConfirmOverwrite, false);
@@ -819,7 +804,7 @@ QString FileDialog::getSaveFileName(
             parent,
             windowTitle,
             dirName,
-            filterSpecList,
+            filterList,
             &selectedFilterIndex,
             options
         )[0];
@@ -838,7 +823,7 @@ QString FileDialog::getSaveFileName(
 #ifndef NDEBUG
     testNormalizeSavePath();
 #endif  // NDEBUG
-    normalizeSavePath(file, filterSpecList[selectedFilterIndex]);
+    normalizeSavePath(file, filterList[selectedFilterIndex]);
 
     setWorkingDirectory(file);
     return file;
@@ -894,9 +879,9 @@ QString FileDialog::getOpenFileName(
         windowTitle = FileDialog::tr("Open");
     }
 
-    const auto filterSpecList = FilterSpecList::fromFilterStringList(filters);
+    const auto filterList = filterListFromStringList(filters);
     qsizetype selectedFilterIndex = (selectedFilter && !selectedFilter->isEmpty())
-        ? filterSpecList.indexOfFilterString(*selectedFilter)
+        ? indexOfFilterString(filterList, *selectedFilter)
         : -1;
 
     options |= QFileDialog::HideNameFilterDetails;
@@ -904,7 +889,7 @@ QString FileDialog::getOpenFileName(
     QString file;
     if (DialogOptions::dontUseNativeFileDialog()) {
         const bool showPatterns = getPreferShowFilterPatterns();
-        const auto qtFilterList = filterSpecList.toQtFilterList(showPatterns);
+        const auto qtFilterList = toQtFilterList(filterList, showPatterns);
         QList<QUrl> urls = fetchSidebarUrls();
 
         options |= QFileDialog::DontUseNativeDialog;
@@ -920,7 +905,7 @@ QString FileDialog::getOpenFileName(
         dlg.setDirectory(dirName);
         dlg.setNameFilters(qtFilterList);
         if (selectedFilterIndex >= 0) {
-            dlg.selectNameFilter(filterSpecList[selectedFilterIndex].toQtFilter(showPatterns));
+            dlg.selectNameFilter(toQtFilter(filterList[selectedFilterIndex], showPatterns));
         }
         if (dlg.exec() == QDialog::Accepted) {
             if (selectedFilter) {
@@ -935,7 +920,7 @@ QString FileDialog::getOpenFileName(
             parent,
             windowTitle,
             dirName,
-            filterSpecList,
+            filterList,
             &selectedFilterIndex,
             options
         )[0];
@@ -978,9 +963,9 @@ QStringList FileDialog::getOpenFileNames(
         windowTitle = FileDialog::tr("Open");
     }
 
-    const auto filterSpecList = FilterSpecList::fromFilterStringList(filters);
+    const auto filterList = filterListFromStringList(filters);
     qsizetype selectedFilterIndex = (selectedFilter != nullptr && !selectedFilter->isEmpty())
-        ? filterSpecList.indexOfFilterString(*selectedFilter)
+        ? indexOfFilterString(filterList, *selectedFilter)
         : -1;
 
     options |= QFileDialog::HideNameFilterDetails;
@@ -988,7 +973,7 @@ QStringList FileDialog::getOpenFileNames(
     QStringList files;
     if (DialogOptions::dontUseNativeFileDialog()) {
         const bool showPatterns = getPreferShowFilterPatterns();
-        const auto qtFilterList = filterSpecList.toQtFilterList(showPatterns);
+        const auto qtFilterList = toQtFilterList(filterList, showPatterns);
         QList<QUrl> urls = fetchSidebarUrls();
 
         options |= QFileDialog::DontUseNativeDialog;
@@ -1004,7 +989,7 @@ QStringList FileDialog::getOpenFileNames(
         dlg.setDirectory(dirName);
         dlg.setNameFilters(qtFilterList);
         if (selectedFilterIndex >= 0) {
-            dlg.selectNameFilter(filterSpecList[selectedFilterIndex].toQtFilter(showPatterns));
+            dlg.selectNameFilter(toQtFilter(filterList[selectedFilterIndex], showPatterns));
         }
         if (dlg.exec() == QDialog::Accepted) {
             if (selectedFilter) {
@@ -1019,7 +1004,7 @@ QStringList FileDialog::getOpenFileNames(
             parent,
             windowTitle,
             dirName,
-            filterSpecList,
+            filterList,
             &selectedFilterIndex,
             options
         );
