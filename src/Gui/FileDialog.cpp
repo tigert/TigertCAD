@@ -428,9 +428,13 @@ static QStringList nativeFileDialog(
         ofn.nFilterIndex = selectedFilterIndex + 1;  // OPENFILENAMEW index is 1-based
     }
 
+    const QFileInfo startPathInfo(startPath);
+
     constexpr const DWORD SelectionBufferSize = 65535;
     auto selectedFile = std::make_unique<wchar_t[]>(SelectionBufferSize);
-    selectedFile[0] = L'\0';
+    startPathInfo.fileName().toWCharArray(selectedFile.get());
+    selectedFile[startPathInfo.fileName().size()] = L'\0';
+
     ofn.nMaxFile = SelectionBufferSize;
     ofn.lpstrFile = selectedFile.get();
 
@@ -468,7 +472,7 @@ static QStringList nativeFileDialog(
             const wchar_t* ptr = ofn.lpstrFile + dir.size() + 1;
             if (*ptr) {
                 selected.clear();
-                const QString path = dir + u'/';
+                const QString path = dir + L'/';
                 while (*ptr) {
                     const QString fileName = QString::fromWCharArray(ptr);
                     selected += path + fileName;
