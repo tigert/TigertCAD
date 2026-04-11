@@ -21,12 +21,15 @@
 *                                                                          *
 ***************************************************************************/"""
 
+import os
 import threading
 import time
 import unittest
+import zipfile
 
 import FreeCAD
 import FreeCADGui
+from PySide6 import QtCore, QtWidgets
 
 # ---------------------------------------------------------------------------
 # define the functions to test the FreeCAD Gui Document code
@@ -41,6 +44,56 @@ class TestGuiDocument(unittest.TestCase):
     def tearDown(self):
         # Close the document
         FreeCAD.closeDocument("TestDoc")
+
+    def _findAutoSaver(self):
+        app = QtWidgets.QApplication.instance()
+        self.assertIsNotNone(app)
+
+        for child in app.children():
+            meta_object = child.metaObject() if hasattr(child, "metaObject") else None
+            if meta_object and meta_object.className() == "Gui::AutoSaver":
+                return child
+
+        raise self.failureException("Gui::AutoSaver was not found in the QApplication object tree")
+
+    def _recoveryArchive(self):
+        return os.path.join(self.doc.TransientDir, "fc_recovery_file.fcstd")
+
+    def _removeRecoveryArchive(self):
+        archive = self._recoveryArchive()
+        if os.path.exists(archive):
+            os.remove(archive)
+
+    def _invokeAutoSaverFlush(self):
+        invoked = QtCore.QMetaObject.invokeMethod(
+            self._findAutoSaver(),
+            "flushPendingSave",
+            QtCore.Qt.ConnectionType.DirectConnection,
+            QtCore.Q_ARG(str, self.doc.Name),
+        )
+        self.assertTrue(invoked)
+
+    def _processEventsUntil(self, predicate, timeout=3.0):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            QtWidgets.QApplication.processEvents(QtCore.QEventLoop.ProcessEventsFlag.AllEvents, 50)
+            if predicate():
+                return True
+            time.sleep(0.01)
+
+        return predicate()
+
+    def _assertRecoveryArchiveContains(self, expected_label=None):
+        archive = self._recoveryArchive()
+        self.assertTrue(os.path.isfile(archive))
+
+        with zipfile.ZipFile(archive) as recovery:
+            self.assertIn("Document.xml", recovery.namelist())
+            self.assertIn("GuiDocument.xml", recovery.namelist())
+
+            if expected_label is not None:
+                document_xml = recovery.read("Document.xml").decode("utf-8", errors="replace")
+                self.assertIn(expected_label, document_xml)
 
     def testGetTreeRootObject(self):
         # Create objects at the root level
@@ -108,3 +161,50 @@ class TestGuiDocument(unittest.TestCase):
 
         self.assertEqual(proxy.executed_thread_id, threading.get_ident())
         self.assertGreaterEqual(elapsed, 0.04)
+
+    def testRecoverySnapshotIncludesGuiDocument(self):
+        self.doc.addObject("App::FeaturePython", "RecoveryGuiObject")
+
+        self.assertTrue(FreeCAD.writeRecoverySnapshotToTransientDir(self.doc))
+
+        self._assertRecoveryArchiveContains()
+
+    def testAutoSaverFlushWritesRecoverySnapshot(self):
+        obj = self.doc.addObject("App::FeaturePython", "AutoSaveGuiObject")
+        obj.Label = "AutoSaveImmediate"
+        self._removeRecoveryArchive()
+
+        self._invokeAutoSaverFlush()
+
+        self._assertRecoveryArchiveContains(expected_label="AutoSaveImmediate")
+
+    def testAutoSaverRetriesWhenDocumentBecomesStable(self):
+        obj = self.doc.addObject("App::FeaturePython", "AutoSaveBlockedObject")
+        self._removeRecoveryArchive()
+
+        self.doc.openTransaction("AutoSaveBlocked")
+        obj.Label = "AutoSaveRetried"
+        self._invokeAutoSaverFlush()
+
+        self.assertFalse(os.path.exists(self._recoveryArchive()))
+
+        self.doc.abortTransaction()
+
+        self.assertTrue(self._processEventsUntil(lambda: os.path.exists(self._recoveryArchive())))
+        self._assertRecoveryArchiveContains()
+
+    def testAutoSaverCoalescesBlockedFlushesToLatestCommittedState(self):
+        obj = self.doc.addObject("App::FeaturePython", "AutoSaveChurnObject")
+        self._removeRecoveryArchive()
+
+        self.doc.openTransaction("AutoSaveChurn")
+        for index in range(8):
+            obj.Label = f"AutoSaveBurst{index}"
+            self._invokeAutoSaverFlush()
+
+        self.assertFalse(os.path.exists(self._recoveryArchive()))
+
+        self.doc.commitTransaction()
+
+        self.assertTrue(self._processEventsUntil(lambda: os.path.exists(self._recoveryArchive())))
+        self._assertRecoveryArchiveContains(expected_label="AutoSaveBurst7")
