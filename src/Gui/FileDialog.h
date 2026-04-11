@@ -147,11 +147,6 @@ private:
     static QString workingDirectory;
 };
 
-namespace detail
-{
-GuiExport void normalizeSavePath(QString&, const FileDialog::Filter&);
-}  // namespace detail
-
 // ----------------------------------------------------------------------
 
 /**

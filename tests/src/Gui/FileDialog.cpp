@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <Gui/FileDialog.h>
+#include <Gui/FileDialogInternal.h>
 
 
 using namespace Gui;
@@ -14,9 +15,9 @@ TEST(FileDialog, testNormalizeSavePath)
         QStringLiteral("Whatever files (what ev.er *.abc *.xyz)")
     );
     const auto test = [filt](QString path, const QString& desired) {
-        detail::normalizeSavePath(path, filt);
+        FileDialogInternal::normalizeSavePath(path, filt);
         const auto firstPassResult = path;
-        detail::normalizeSavePath(path, filt);
+        FileDialogInternal::normalizeSavePath(path, filt);
         EXPECT_EQ(firstPassResult, path) << "not idempotent";
         EXPECT_EQ(path, desired);
     };

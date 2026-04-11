@@ -55,12 +55,12 @@
 #include <QStyle>
 #include <QUrl>
 
-
 #include <Base/Parameter.h>
 #include <App/Application.h>
 #include <App/Document.h>
 
 #include "FileDialog.h"
+#include "FileDialogInternal.h"
 #include "MainWindow.h"
 #include "Tools.h"
 
@@ -261,7 +261,7 @@ void FileDialog::accept()
     QFileDialog::accept();
 }
 
-static bool getPreferShowFilterPatterns()
+bool FileDialogInternal::getPreferShowFilterPatterns()
 {
     bool show = true;
 #ifdef FC_OS_WIN32
@@ -304,7 +304,7 @@ bool FileDialog::Filter::isWildcard() const
     return false;
 }
 
-static QString getFilterDisplayName(const FileDialog::Filter& filter, bool showPatterns)
+QString FileDialogInternal::getFilterDisplayName(const FileDialog::Filter& filter, bool showPatterns)
 {
     // Avoid overflowing the screen with an excessively long filter list (see #23139).
     const qsizetype MaxFiltersLength = 128;
@@ -353,7 +353,7 @@ static QString getFilterDisplayName(const FileDialog::Filter& filter, bool showP
 
 static QString toQtFilter(const FileDialog::Filter& filter, bool showPatterns)
 {
-    return getFilterDisplayName(filter, showPatterns) + QStringLiteral(" (")
+    return FileDialogInternal::getFilterDisplayName(filter, showPatterns) + QStringLiteral(" (")
         + filter.patterns.join(QLatin1Char(' ')) + QLatin1Char(')');
 }
 
@@ -371,120 +371,8 @@ qsizetype indexOfFilterString(const FileDialog::FilterList& filterList, const QS
     return filterList.indexOf(FileDialog::Filter::fromFilterString(filterString));
 }
 
-enum class NativeFileDialogMode
-{
-    OpenSingle,
-    OpenMultiple,
-    Save,
-};
-
-#ifdef FC_OS_WIN32
-static std::unique_ptr<wchar_t[]> qStringToWCharArray(const QString& s, size_t reserveSize = 0)
-{
-    const size_t stringSize = s.size();
-    wchar_t* result = new wchar_t[qMax(stringSize + 1, reserveSize)];
-    s.toWCharArray(result);
-    result[stringSize] = 0;
-    return std::unique_ptr<wchar_t[]>(result);
-}
-
-/* Use the legacy Get{Open,Save}FileNameW functions as the Vista+ IFileDialog forces
- * pattern/extension display in filter lists, leading to exceedingly long entries as seen in
- * issue #23139.
- * Note neither this legacy function set nor IFileDialog are valid for UWP WinRT,
- * for which Windows::Storage::Pickers::FileOpenPicker will have to be used instead.
- */
-static QStringList nativeFileDialog(
-    NativeFileDialogMode mode,
-    QWidget* parent,
-    const QString& caption,
-    const QString& startPath,
-    const FileDialog::FilterList& filters,
-    qsizetype& selectedFilterIndex,
-    FileDialog::Options options
-)
-{
-    const bool showPatterns = getPreferShowFilterPatterns();
-
-    OPENFILENAMEW ofn;
-    memset(&ofn, 0, sizeof(OPENFILENAMEW));
-    ofn.lStructSize = sizeof(OPENFILENAMEW);
-    if (parent) {
-        ofn.hwndOwner = HWND(parent->winId());
-    }
-
-    QString flatFilter;
-    for (const auto& filter : filters) {
-        flatFilter += getFilterDisplayName(filter, showPatterns);
-        flatFilter += QLatin1Char('\0');
-        flatFilter += filter.patterns.join(QLatin1Char(';'));
-        flatFilter += QLatin1Char('\0');
-    }
-    flatFilter += QLatin1Char('\0');
-    auto ofnFilter = qStringToWCharArray(flatFilter);
-    ofn.lpstrFilter = ofnFilter.get();
-
-    if (selectedFilterIndex >= 0) {
-        ofn.nFilterIndex = selectedFilterIndex + 1;  // OPENFILENAMEW index is 1-based
-    }
-
-    const QFileInfo startPathInfo(startPath);
-
-    constexpr const DWORD SelectionBufferSize = 65535;
-    auto selectedFile = std::make_unique<wchar_t[]>(SelectionBufferSize);
-    startPathInfo.fileName().toWCharArray(selectedFile.get());
-    selectedFile[startPathInfo.fileName().size()] = L'\0';
-
-    ofn.nMaxFile = SelectionBufferSize;
-    ofn.lpstrFile = selectedFile.get();
-
-    auto initialDir = qStringToWCharArray(QDir::toNativeSeparators(startPath));
-    ofn.lpstrInitialDir = initialDir.get();
-
-    auto title = qStringToWCharArray(caption);
-    ofn.lpstrTitle = title.get();
-
-    ofn.Flags = OFN_NOCHANGEDIR | OFN_HIDEREADONLY | OFN_EXPLORER | OFN_PATHMUSTEXIST;
-    if (mode == NativeFileDialogMode::OpenSingle || mode == NativeFileDialogMode::OpenMultiple) {
-        ofn.Flags |= OFN_FILEMUSTEXIST;
-    }
-
-    BOOL ok = FALSE;
-    if (mode == NativeFileDialogMode::OpenSingle) {
-        ok = ::GetOpenFileNameW(&ofn);
-    }
-    else if (mode == NativeFileDialogMode::OpenMultiple) {
-        ofn.Flags |= OFN_ALLOWMULTISELECT;
-        ok = ::GetOpenFileNameW(&ofn);
-    }
-    else /* (mode == NativeFileDialogMode::Save) */ {
-        ok = ::GetSaveFileNameW(&ofn);
-    }
-
-    QStringList selected;
-    // Always return a selected filter index >= 0, but
-    // ofn.nFilterIndex, while 1-based, might be 0 if the user cancelled.
-    selectedFilterIndex = ofn.nFilterIndex == 0 ? 0 : (ofn.nFilterIndex - 1);
-    if (ok != FALSE) {
-        const QString dir = QDir::cleanPath(QString::fromWCharArray(ofn.lpstrFile));
-        selected += dir;
-        if (ofn.Flags & OFN_ALLOWMULTISELECT) {
-            const wchar_t* ptr = ofn.lpstrFile + dir.size() + 1;
-            if (*ptr) {
-                selected.clear();
-                const QString path = dir + L'/';
-                while (*ptr) {
-                    const QString fileName = QString::fromWCharArray(ptr);
-                    selected += path + fileName;
-                    ptr += fileName.size() + 1;
-                }
-            }
-        }
-    }
-    return selected;
-}
-#else
-static QStringList nativeFileDialog(
+#ifndef FC_OS_WIN32
+QStringList FileDialogInternal::nativeFileDialog(
     NativeFileDialogMode mode,
     QWidget* parent,
     const QString& caption,
@@ -537,7 +425,7 @@ static QStringList nativeFileDialog(
  * Modifies a path obtained as a result of a save file dialog to ensure the file
  * name matches the selected file filter.
  */
-void detail::normalizeSavePath(QString& path, const FileDialog::Filter& selectedFilter)
+void FileDialogInternal::normalizeSavePath(QString& path, const FileDialog::Filter& selectedFilter)
 {
     // Wildcards have no rule by definition.
     if (selectedFilter.isWildcard()) {
@@ -640,7 +528,10 @@ QString FileDialog::getSaveFileName(
             // of the pre-selected filter, if applicable.
             hasFilename = true;
             if (actuallySelectedFilterIndex >= 0) {
-                detail::normalizeSavePath(suggestedPath, filters[actuallySelectedFilterIndex]);
+                FileDialogInternal::normalizeSavePath(
+                    suggestedPath,
+                    filters[actuallySelectedFilterIndex]
+                );
             }
         }
     }
@@ -654,7 +545,7 @@ QString FileDialog::getSaveFileName(
 
     QString file;
     if (DialogOptions::dontUseNativeFileDialog()) {
-        const bool showPatterns = getPreferShowFilterPatterns();
+        const bool showPatterns = FileDialogInternal::getPreferShowFilterPatterns();
         const auto qtFilterList = toQtFilterList(filters, showPatterns);
         QList<QUrl> urls = fetchSidebarUrls();
 
@@ -689,7 +580,7 @@ QString FileDialog::getSaveFileName(
     }
     else {
         const auto files = nativeFileDialog(
-            NativeFileDialogMode::Save,
+            FileDialogInternal::NativeFileDialogMode::Save,
             parent,
             windowTitle,
             suggestedPath,
@@ -717,7 +608,7 @@ QString FileDialog::getSaveFileName(
     // file if the platform dialog didn't enforce pattern matching and prompt the user
     // upon overwrite. Take the path of least destruction.
     const QString pristineUserInput(file);
-    detail::normalizeSavePath(file, filters[actuallySelectedFilterIndex]);
+    FileDialogInternal::normalizeSavePath(file, filters[actuallySelectedFilterIndex]);
     if (file != pristineUserInput && QFileInfo::exists(file)) {
         file = pristineUserInput;
     }
@@ -783,7 +674,7 @@ QString FileDialog::getOpenFileName(
 
     QString file;
     if (DialogOptions::dontUseNativeFileDialog()) {
-        const bool showPatterns = getPreferShowFilterPatterns();
+        const bool showPatterns = FileDialogInternal::getPreferShowFilterPatterns();
         const auto qtFilterList = toQtFilterList(filters, showPatterns);
         QList<QUrl> urls = fetchSidebarUrls();
 
@@ -811,7 +702,7 @@ QString FileDialog::getOpenFileName(
     }
     else {
         const auto files = nativeFileDialog(
-            NativeFileDialogMode::OpenSingle,
+            FileDialogInternal::NativeFileDialogMode::OpenSingle,
             parent,
             windowTitle,
             dirName,
@@ -819,8 +710,7 @@ QString FileDialog::getOpenFileName(
             actuallySelectedFilterIndex,
             options
         );
-        if (!files.isEmpty())
-        {
+        if (!files.isEmpty()) {
             file = files.constFirst();
         }
     }
@@ -870,7 +760,7 @@ QStringList FileDialog::getOpenFileNames(
 
     QStringList files;
     if (DialogOptions::dontUseNativeFileDialog()) {
-        const bool showPatterns = getPreferShowFilterPatterns();
+        const bool showPatterns = FileDialogInternal::getPreferShowFilterPatterns();
         const auto qtFilterList = toQtFilterList(filters, showPatterns);
         QList<QUrl> urls = fetchSidebarUrls();
 
@@ -898,7 +788,7 @@ QStringList FileDialog::getOpenFileNames(
     }
     else {
         files = nativeFileDialog(
-            NativeFileDialogMode::OpenMultiple,
+            FileDialogInternal::NativeFileDialogMode::OpenMultiple,
             parent,
             windowTitle,
             dirName,
