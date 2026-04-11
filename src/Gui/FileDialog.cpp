@@ -458,8 +458,10 @@ static QStringList nativeFileDialog(
     }
 
     QStringList selected;
-    if (ok) {
-        selectedFilterIndex = ofn.nFilterIndex - 1;
+    // Always return a selected filter index >= 0, but
+    // ofn.nFilterIndex, while 1-based, might be 0 if the user cancelled.
+    selectedFilterIndex = ofn.nFilterIndex == 0 ? 0 : (ofn.nFilterIndex - 1);
+    if (ok != FALSE) {
         const QString dir = QDir::cleanPath(QString::fromWCharArray(ofn.lpstrFile));
         selected += dir;
         if (ofn.Flags & OFN_ALLOWMULTISELECT) {
@@ -682,7 +684,7 @@ QString FileDialog::getSaveFileName(
         actuallySelectedFilterIndex = qtFilterList.indexOf(dlg.selectedNameFilter());
     }
     else {
-        file = nativeFileDialog(
+        const auto files = nativeFileDialog(
             NativeFileDialogMode::Save,
             parent,
             windowTitle,
@@ -690,7 +692,10 @@ QString FileDialog::getSaveFileName(
             filters,
             actuallySelectedFilterIndex,
             options
-        )[0];
+        );
+        if (!files.isEmpty()) {
+            file = files.constFirst();
+        }
     }
 
     if (selectedFilterIndex != nullptr) {
@@ -801,7 +806,7 @@ QString FileDialog::getOpenFileName(
         actuallySelectedFilterIndex = qtFilterList.indexOf(dlg.selectedNameFilter());
     }
     else {
-        file = nativeFileDialog(
+        const auto files = nativeFileDialog(
             NativeFileDialogMode::OpenSingle,
             parent,
             windowTitle,
@@ -809,7 +814,11 @@ QString FileDialog::getOpenFileName(
             filters,
             actuallySelectedFilterIndex,
             options
-        )[0];
+        );
+        if (!files.isEmpty())
+        {
+            file = files.constFirst();
+        }
     }
 
     if (selectedFilterIndex != nullptr) {
