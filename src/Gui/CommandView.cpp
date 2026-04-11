@@ -454,7 +454,7 @@ void StdCmdFreezeViews::onSaveViews()
         getMainWindow(),
         QObject::tr("Save Frozen Views"),
         QString(),
-        QStringList(QStringLiteral("%1 (*.cam)").arg(QObject::tr("Frozen views")))
+        FileDialog::FilterList {{QObject::tr("Frozen views"), {"*.cam"}}}
     );
     if (fn.isEmpty()) {
         return;
@@ -516,7 +516,7 @@ void StdCmdFreezeViews::onRestoreViews()
         getMainWindow(),
         QObject::tr("Restore Frozen Views"),
         QString(),
-        QStringList(QStringLiteral("%1 (*.cam)").arg(QObject::tr("Frozen views")))
+        FileDialog::FilterList {{QObject::tr("Frozen views"), {"*.cam"}}}
     );
     if (fn.isEmpty()) {
         return;

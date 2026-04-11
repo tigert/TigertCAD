@@ -83,6 +83,8 @@ public:
          */
         static Filter fromFilterString(const QString& filter);
 
+        QString toFilterString() const;
+
         bool operator==(const Filter& rhs) const
         {
             return name == rhs.name && patterns == rhs.patterns;
@@ -96,31 +98,31 @@ public:
     static QString getOpenFileName(
         QWidget* parent = nullptr,
         const QString& caption = QString(),
-        const QString& dir = QString(),
-        const QStringList& filters = QStringList(),
-        QString* selectedFilter = nullptr,
+        const QString& startPath = QString(),
+        const FilterList& filters = {},
+        qsizetype* selectedFilterIndex = nullptr,
         Options options = Options()
     );
     static QString getSaveFileName(
         QWidget* parent = nullptr,
         const QString& caption = QString(),
-        const QString& dir = QString(),
-        const QStringList& filters = QStringList(),
-        QString* selectedFilter = nullptr,
+        const QString& startPath = QString(),
+        const FilterList& filters = {},
+        qsizetype* selectedFilterIndex = nullptr,
         Options options = Options()
     );
     static QString getExistingDirectory(
         QWidget* parent = nullptr,
         const QString& caption = QString(),
-        const QString& dir = QString(),
+        const QString& startPath = QString(),
         Options options = ShowDirsOnly
     );
     static QStringList getOpenFileNames(
         QWidget* parent = nullptr,
         const QString& caption = QString(),
-        const QString& dir = QString(),
-        const QStringList& filters = QStringList(),
-        QString* selectedFilter = nullptr,
+        const QString& startPath = QString(),
+        const FilterList& filters = {},
+        qsizetype* selectedFilterIndex = nullptr,
         Options options = Options()
     );
 

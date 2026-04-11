@@ -261,22 +261,6 @@ void FileDialog::accept()
     QFileDialog::accept();
 }
 
-static void getSuffixesDescription(QStringList& suffixes, const QString& suffixDescriptions)
-{
-    QRegularExpression rx;
-    // start the raw string with a (
-    // match a *, a . and at least one word character (a-z, A-Z, 0-9, _) with \*\.\w+
-    // end the raw string with a )
-    rx.setPattern(QStringLiteral(R"(\*\.\w+)"));
-
-    QRegularExpressionMatchIterator i = rx.globalMatch(suffixDescriptions);
-    while (i.hasNext()) {
-        QRegularExpressionMatch match = i.next();
-        QString suffix = match.captured(0);
-        suffixes << suffix;
-    }
-}
-
 static bool getPreferShowFilterPatterns()
 {
     bool show = true;
@@ -300,7 +284,14 @@ FileDialog::Filter FileDialog::Filter::fromFilterString(const QString& filter)
     const auto end = filter.lastIndexOf(QLatin1Char(')'));
     const auto name = filter.left(start).trimmed();
     const auto patternsPart = filter.mid(start + 1, end - start - 1);
+    // ";" separators are explicitly not supported as this could
+    // encourage having more than one canonical string represenation.
     return {name, patternsPart.split(QLatin1Char(' '), Qt::SkipEmptyParts)};
+}
+
+QString FileDialog::Filter::toFilterString() const
+{
+    return name + QStringLiteral(" (") + patterns.join(QLatin1Char(' ')) + QLatin1Char(')');
 }
 
 bool FileDialog::Filter::isWildcard() const
@@ -366,19 +357,6 @@ static QString toQtFilter(const FileDialog::Filter& filter, bool showPatterns)
         + filter.patterns.join(QLatin1Char(' ')) + QLatin1Char(')');
 }
 
-// This function is intentionally not exposed as code using `FilterList`s
-// should be using them natively as intended, not converted from strings
-// at the last minute.
-static FileDialog::FilterList filterListFromStringList(const QStringList& filterStringList)
-{
-    FileDialog::FilterList filters;
-    filters.reserve(filterStringList.length());
-    for (const auto& filterString : filterStringList) {
-        filters += FileDialog::Filter::fromFilterString(filterString);
-    }
-    return filters;
-}
-
 QStringList toQtFilterList(const FileDialog::FilterList& filterList, bool showPatterns)
 {
     QStringList qtFilters;
@@ -420,9 +398,9 @@ static QStringList nativeFileDialog(
     NativeFileDialogMode mode,
     QWidget* parent,
     const QString& caption,
-    const QString& dir,
+    const QString& startPath,
     const FileDialog::FilterList& filters,
-    qsizetype* selectedFilterIndex,
+    qsizetype& selectedFilterIndex,
     FileDialog::Options options
 )
 {
@@ -446,8 +424,8 @@ static QStringList nativeFileDialog(
     auto ofnFilter = qStringToWCharArray(flatFilter);
     ofn.lpstrFilter = ofnFilter.get();
 
-    if (selectedFilterIndex && *selectedFilterIndex >= 0) {
-        ofn.nFilterIndex = *selectedFilterIndex + 1;  // OPENFILENAMEW index is 1-based
+    if (selectedFilterIndex >= 0) {
+        ofn.nFilterIndex = selectedFilterIndex + 1;  // OPENFILENAMEW index is 1-based
     }
 
     constexpr const DWORD SelectionBufferSize = 65535;
@@ -456,7 +434,7 @@ static QStringList nativeFileDialog(
     ofn.nMaxFile = SelectionBufferSize;
     ofn.lpstrFile = selectedFile.get();
 
-    auto initialDir = qStringToWCharArray(QDir::toNativeSeparators(dir));
+    auto initialDir = qStringToWCharArray(QDir::toNativeSeparators(startPath));
     ofn.lpstrInitialDir = initialDir.get();
 
     auto title = qStringToWCharArray(caption);
@@ -481,9 +459,7 @@ static QStringList nativeFileDialog(
 
     QStringList selected;
     if (ok) {
-        if (selectedFilterIndex) {
-            *selectedFilterIndex = ofn.nFilterIndex - 1;
-        }
+        selectedFilterIndex = ofn.nFilterIndex - 1;
         const QString dir = QDir::cleanPath(QString::fromWCharArray(ofn.lpstrFile));
         selected += dir;
         if (ofn.Flags & OFN_ALLOWMULTISELECT) {
@@ -506,23 +482,21 @@ static QStringList nativeFileDialog(
     NativeFileDialogMode mode,
     QWidget* parent,
     const QString& caption,
-    const QString& dir,
+    const QString& startPath,
     const FileDialog::FilterList& filters,
-    qsizetype* selectedFilterIndex,
+    qsizetype& selectedFilterIndex,
     FileDialog::Options options
 )
 {
     const bool showPatterns = getPreferShowFilterPatterns();
     const auto qtFilterList = toQtFilterList(filters, showPatterns);
-    QString selectedQtFilter = (selectedFilterIndex != nullptr && *selectedFilterIndex >= 0)
-        ? qtFilterList[*selectedFilterIndex]
-        : "";
+    QString selectedQtFilter = (selectedFilterIndex >= 0) ? qtFilterList[selectedFilterIndex] : "";
     QStringList selected;
     if (mode == NativeFileDialogMode::OpenSingle) {
         selected << QFileDialog::getOpenFileName(
             parent,
             caption,
-            dir,
+            startPath,
             qtFilterList.join(QStringLiteral(";;")),
             &selectedQtFilter,
             options
@@ -532,7 +506,7 @@ static QStringList nativeFileDialog(
         selected << QFileDialog::getOpenFileNames(
             parent,
             caption,
-            dir,
+            startPath,
             qtFilterList.join(QStringLiteral(";;")),
             &selectedQtFilter,
             options
@@ -542,15 +516,13 @@ static QStringList nativeFileDialog(
         selected << QFileDialog::getSaveFileName(
             parent,
             caption,
-            dir,
+            startPath,
             qtFilterList.join(QStringLiteral(";;")),
             &selectedQtFilter,
             options
         );
     }
-    if (selectedFilterIndex != nullptr) {
-        *selectedFilterIndex = qtFilterList.indexOf(selectedQtFilter);
-    }
+    selectedFilterIndex = qtFilterList.indexOf(selectedQtFilter);
     return selected;
 }
 #endif
@@ -633,48 +605,36 @@ void detail::normalizeSavePath(QString& path, const FileDialog::Filter& selected
 QString FileDialog::getSaveFileName(
     QWidget* parent,
     const QString& caption,
-    const QString& dir,
-    const QStringList& filters,
-    QString* selectedFilter,
+    const QString& startPath,
+    const FilterList& filters,
+    qsizetype* selectedFilterIndex,
     Options options
 )
 {
     ActionDisabler actionDisabler {};
-    QString dirName = dir;
+    qsizetype actuallySelectedFilterIndex = selectedFilterIndex != nullptr ? *selectedFilterIndex
+                                                                           : -1;
+    QString suggestedPath = startPath;
     bool hasFilename = false;
-    if (dirName.isEmpty()) {
-        dirName = getPreferredDialogDirectory();
+    if (suggestedPath.isEmpty()) {
+        suggestedPath = getPreferredDialogDirectory();
     }
     else {
-        QFileInfo fi(dir);
+        QFileInfo fi(suggestedPath);
         if (fi.isRelative()) {
-            dirName = getPreferredDialogDirectory();
-            dirName += QStringLiteral("/");
-            dirName += fi.fileName();
+            suggestedPath = getPreferredDialogDirectory();
+            suggestedPath += QStringLiteral("/");
+            suggestedPath += fi.fileName();
+            fi.setFile(suggestedPath);
         }
-        if (!fi.fileName().isEmpty()) {
+        // If the startPath points to a directory (path ends with separator, or points
+        // to existing dir), don't touch it and don't use QFileDialog::selectFile() later.
+        if (!(fi.fileName().isEmpty() || fi.isDir())) {
+            // If there is a file name at the end, make sure it matches one of the patterns
+            // of the pre-selected filter, if applicable.
             hasFilename = true;
-        }
-
-        // get the suffix for the filter: use the selected filter if there is one,
-        // otherwise find the first valid suffix in the complete list of filters
-        QString filterToSearch;
-        if (selectedFilter && !selectedFilter->isEmpty()) {
-            filterToSearch = *selectedFilter;
-        }
-        else {
-            filterToSearch = filters.join(QLatin1Char(';'));
-        }
-
-        QStringList filterSuffixes;
-        getSuffixesDescription(filterSuffixes, filterToSearch);
-        const QString fiSuffix = fi.suffix();
-        const QString dotSuffix = QLatin1String("*.") + fiSuffix;  // To match with filterSuffixes
-        if (fiSuffix.isEmpty() || !filterSuffixes.contains(dotSuffix)) {
-            // there is no suffix or not a suffix that matches the filter, so
-            // default to the first suffix of the filter
-            if (!filterSuffixes.isEmpty()) {
-                dirName += filterSuffixes[0].mid(1);
+            if (actuallySelectedFilterIndex >= 0) {
+                detail::normalizeSavePath(suggestedPath, filters[actuallySelectedFilterIndex]);
             }
         }
     }
@@ -684,20 +644,12 @@ QString FileDialog::getSaveFileName(
         windowTitle = FileDialog::tr("Save As");
     }
 
-    const auto filterList = filterListFromStringList(filters);
-    qsizetype selectedFilterIndex = (selectedFilter != nullptr && !selectedFilter->isEmpty())
-        ? indexOfFilterString(filterList, *selectedFilter)
-        : -1;
-
     options |= QFileDialog::HideNameFilterDetails;
 
-    // NOTE: We must not change the specified file name afterwards as we may return the name of an
-    // already existing file. Hence we must extract the first matching suffix from the filter list
-    // and append it before showing the file dialog.
     QString file;
     if (DialogOptions::dontUseNativeFileDialog()) {
         const bool showPatterns = getPreferShowFilterPatterns();
-        const auto qtFilterList = toQtFilterList(filterList, showPatterns);
+        const auto qtFilterList = toQtFilterList(filters, showPatterns);
         QList<QUrl> urls = fetchSidebarUrls();
 
         options |= QFileDialog::DontUseNativeDialog;
@@ -710,36 +662,39 @@ QString FileDialog::getSaveFileName(
         dlg.setIconProvider(iconprov.get());
         dlg.setFileMode(QFileDialog::AnyFile);
         dlg.setAcceptMode(QFileDialog::AcceptSave);
-        dlg.setDirectory(dirName);
+        dlg.setDirectory(suggestedPath);
         if (hasFilename) {
-            dlg.selectFile(dirName);
+            dlg.selectFile(suggestedPath);
         }
         dlg.setNameFilters(qtFilterList);
-        if (selectedFilterIndex >= 0) {
-            dlg.selectNameFilter(toQtFilter(filterList[selectedFilterIndex], showPatterns));
+        if (actuallySelectedFilterIndex >= 0) {
+            dlg.selectNameFilter(toQtFilter(filters[actuallySelectedFilterIndex], showPatterns));
         }
         dlg.onSelectedFilter(dlg.selectedNameFilter());
         dlg.setOption(QFileDialog::DontConfirmOverwrite, false);
         if (dlg.exec() == QDialog::Accepted) {
-            if (selectedFilter) {
-                *selectedFilter = filters[qtFilterList.indexOf(dlg.selectedNameFilter())];
-            }
             file = dlg.selectedFiles().constFirst();
         }
+        // Non-native QFileDialog::selectedNameFilter() always returns a filter, even if
+        // the user cancelled or the dialog wasn't shown at all.
+        // https://github.com/qt/qtbase/blob/53ff8897c5c8bc6175cf94ed24e2d2c5fa17365b/
+        // src/widgets/dialogs/qfiledialog.cpp#L1484
+        actuallySelectedFilterIndex = qtFilterList.indexOf(dlg.selectedNameFilter());
     }
     else {
         file = nativeFileDialog(
             NativeFileDialogMode::Save,
             parent,
             windowTitle,
-            dirName,
-            filterList,
-            &selectedFilterIndex,
+            suggestedPath,
+            filters,
+            actuallySelectedFilterIndex,
             options
         )[0];
-        if (selectedFilter && selectedFilterIndex >= 0) {
-            *selectedFilter = filters[selectedFilterIndex];
-        }
+    }
+
+    if (selectedFilterIndex != nullptr) {
+        *selectedFilterIndex = actuallySelectedFilterIndex;
     }
 
     if (file.isEmpty()) {
@@ -749,7 +704,14 @@ QString FileDialog::getSaveFileName(
     // All directory separators become "/" from here on out.
     file = QDir::fromNativeSeparators(file);
 
-    detail::normalizeSavePath(file, filterList[selectedFilterIndex]);
+    // Changing the file path after selection is risky as we may as well land on an existing
+    // file if the platform dialog didn't enforce pattern matching and prompt the user
+    // upon overwrite. Take the path of least destruction.
+    const QString pristineUserInput(file);
+    detail::normalizeSavePath(file, filters[actuallySelectedFilterIndex]);
+    if (file != pristineUserInput && QFileInfo::exists(file)) {
+        file = pristineUserInput;
+    }
 
     setWorkingDirectory(file);
     return file;
@@ -789,8 +751,8 @@ QString FileDialog::getOpenFileName(
     QWidget* parent,
     const QString& caption,
     const QString& dir,
-    const QStringList& filters,
-    QString* selectedFilter,
+    const FilterList& filters,
+    qsizetype* selectedFilterIndex,
     Options options
 )
 {
@@ -805,17 +767,15 @@ QString FileDialog::getOpenFileName(
         windowTitle = FileDialog::tr("Open");
     }
 
-    const auto filterList = filterListFromStringList(filters);
-    qsizetype selectedFilterIndex = (selectedFilter && !selectedFilter->isEmpty())
-        ? indexOfFilterString(filterList, *selectedFilter)
-        : -1;
-
     options |= QFileDialog::HideNameFilterDetails;
+
+    qsizetype actuallySelectedFilterIndex = selectedFilterIndex != nullptr ? *selectedFilterIndex
+                                                                           : -1;
 
     QString file;
     if (DialogOptions::dontUseNativeFileDialog()) {
         const bool showPatterns = getPreferShowFilterPatterns();
-        const auto qtFilterList = toQtFilterList(filterList, showPatterns);
+        const auto qtFilterList = toQtFilterList(filters, showPatterns);
         QList<QUrl> urls = fetchSidebarUrls();
 
         options |= QFileDialog::DontUseNativeDialog;
@@ -830,15 +790,15 @@ QString FileDialog::getOpenFileName(
         dlg.setAcceptMode(QFileDialog::AcceptOpen);
         dlg.setDirectory(dirName);
         dlg.setNameFilters(qtFilterList);
-        if (selectedFilterIndex >= 0) {
-            dlg.selectNameFilter(toQtFilter(filterList[selectedFilterIndex], showPatterns));
+        if (actuallySelectedFilterIndex >= 0) {
+            dlg.selectNameFilter(toQtFilter(filters[actuallySelectedFilterIndex], showPatterns));
         }
         if (dlg.exec() == QDialog::Accepted) {
-            if (selectedFilter) {
-                *selectedFilter = filters[qtFilterList.indexOf(dlg.selectedNameFilter())];
-            }
             file = dlg.selectedFiles().constFirst();
         }
+        // Non-native QFileDialog::selectedNameFilter() always returns a filter, even if
+        // the user cancelled or the dialog wasn't shown at all.
+        actuallySelectedFilterIndex = qtFilterList.indexOf(dlg.selectedNameFilter());
     }
     else {
         file = nativeFileDialog(
@@ -846,23 +806,24 @@ QString FileDialog::getOpenFileName(
             parent,
             windowTitle,
             dirName,
-            filterList,
-            &selectedFilterIndex,
+            filters,
+            actuallySelectedFilterIndex,
             options
         )[0];
-        if (selectedFilter && selectedFilterIndex >= 0) {
-            *selectedFilter = filters[selectedFilterIndex];
-        }
-        file = QDir::fromNativeSeparators(file);
     }
 
-    if (!file.isEmpty()) {
-        setWorkingDirectory(file);
-        return file;
+    if (selectedFilterIndex != nullptr) {
+        *selectedFilterIndex = actuallySelectedFilterIndex;
     }
-    else {
+
+    if (file.isEmpty()) {
         return {};
     }
+
+    file = QDir::fromNativeSeparators(file);
+
+    setWorkingDirectory(file);
+    return file;
 }
 
 /**
@@ -873,8 +834,8 @@ QStringList FileDialog::getOpenFileNames(
     QWidget* parent,
     const QString& caption,
     const QString& dir,
-    const QStringList& filters,
-    QString* selectedFilter,
+    const FilterList& filters,
+    qsizetype* selectedFilterIndex,
     Options options
 )
 {
@@ -889,17 +850,15 @@ QStringList FileDialog::getOpenFileNames(
         windowTitle = FileDialog::tr("Open");
     }
 
-    const auto filterList = filterListFromStringList(filters);
-    qsizetype selectedFilterIndex = (selectedFilter != nullptr && !selectedFilter->isEmpty())
-        ? indexOfFilterString(filterList, *selectedFilter)
-        : -1;
-
     options |= QFileDialog::HideNameFilterDetails;
+
+    qsizetype actuallySelectedFilterIndex = selectedFilterIndex != nullptr ? *selectedFilterIndex
+                                                                           : -1;
 
     QStringList files;
     if (DialogOptions::dontUseNativeFileDialog()) {
         const bool showPatterns = getPreferShowFilterPatterns();
-        const auto qtFilterList = toQtFilterList(filterList, showPatterns);
+        const auto qtFilterList = toQtFilterList(filters, showPatterns);
         QList<QUrl> urls = fetchSidebarUrls();
 
         options |= QFileDialog::DontUseNativeDialog;
@@ -914,15 +873,15 @@ QStringList FileDialog::getOpenFileNames(
         dlg.setAcceptMode(QFileDialog::AcceptOpen);
         dlg.setDirectory(dirName);
         dlg.setNameFilters(qtFilterList);
-        if (selectedFilterIndex >= 0) {
-            dlg.selectNameFilter(toQtFilter(filterList[selectedFilterIndex], showPatterns));
+        if (actuallySelectedFilterIndex >= 0) {
+            dlg.selectNameFilter(toQtFilter(filters[actuallySelectedFilterIndex], showPatterns));
         }
         if (dlg.exec() == QDialog::Accepted) {
-            if (selectedFilter) {
-                *selectedFilter = filters[qtFilterList.indexOf(dlg.selectedNameFilter())];
-            }
             files = dlg.selectedFiles();
         }
+        // Non-native QFileDialog::selectedNameFilter() always returns a filter, even if
+        // the user cancelled or the dialog wasn't shown at all.
+        actuallySelectedFilterIndex = qtFilterList.indexOf(dlg.selectedNameFilter());
     }
     else {
         files = nativeFileDialog(
@@ -930,16 +889,17 @@ QStringList FileDialog::getOpenFileNames(
             parent,
             windowTitle,
             dirName,
-            filterList,
-            &selectedFilterIndex,
+            filters,
+            actuallySelectedFilterIndex,
             options
         );
-        if (selectedFilter && selectedFilterIndex >= 0) {
-            *selectedFilter = filters[selectedFilterIndex];
-        }
         for (auto& file : files) {
             file = QDir::fromNativeSeparators(file);
         }
+    }
+
+    if (selectedFilterIndex != nullptr) {
+        *selectedFilterIndex = actuallySelectedFilterIndex;
     }
 
     if (!files.isEmpty()) {

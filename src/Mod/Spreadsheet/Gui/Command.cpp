@@ -194,16 +194,14 @@ CmdSpreadsheetImport::CmdSpreadsheetImport()
 void CmdSpreadsheetImport::activated(int iMsg)
 {
     Q_UNUSED(iMsg);
-    QString selectedFilter;
-    QStringList formatList;
-    formatList << QObject::tr("CSV (*.csv *.CSV)");
-    formatList << QObject::tr("All (*)");
+    Gui::FileDialog::FilterList formatList;
+    formatList.append({QObject::tr("CSV"), {"*.csv", "*.CSV"}});
+    formatList.append({QObject::tr("All"), {"*"}});
     QString fileName = Gui::FileDialog::getOpenFileName(
         Gui::getMainWindow(),
         QObject::tr("Import file"),
         QString(),
-        formatList,
-        &selectedFilter
+        formatList
     );
     if (!fileName.isEmpty()) {
         std::string FeatName = getUniqueObjectName("Spreadsheet");

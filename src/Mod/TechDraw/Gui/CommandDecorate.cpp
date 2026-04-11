@@ -355,9 +355,10 @@ void CmdTechDrawImage::activated(int iMsg)
     std::string PageName = page->getNameInDocument();
 
     // Reading an image
-    QStringList filterList;
-    filterList << QString::fromUtf8(QT_TR_NOOP("Image files (*.jpg *.jpeg *.png *.bmp)"));
-    filterList << QString::fromUtf8(QT_TR_NOOP("All files (*)"));
+    const Gui::FileDialog::FilterList filterList {
+        {QString::fromUtf8(QT_TR_NOOP("Image files")), {"*.jpg", "*.jpeg", "*.png", "*.bmp"}},
+        {QString::fromUtf8(QT_TR_NOOP("All files")), {"*"}},
+    };
     QString fileName = Gui::FileDialog::getOpenFileName(Gui::getMainWindow(),
         QString::fromUtf8(QT_TR_NOOP("Select an image file")),
         Preferences::defaultSymbolDir(),

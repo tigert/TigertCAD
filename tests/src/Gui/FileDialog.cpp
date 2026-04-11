@@ -6,6 +6,7 @@
 
 
 using namespace Gui;
+using Filter = FileDialog::Filter;
 
 TEST(FileDialog, testNormalizeSavePath)
 {
@@ -74,6 +75,26 @@ TEST(FileDialog, testNormalizeSavePath)
         test(root + ".", root + ".abc");
         test(root + "..", root + "..abc");
     }
+}
+
+TEST(FileDialog, testFilterFromFilterString)
+{
+    const auto eq =
+        [](bool positive, const QString& string, const QString& name, const QStringList& patterns) {
+            const auto fromString = Filter::fromFilterString(string);
+            const Filter expected {name, patterns};
+            if (positive) {
+                EXPECT_EQ(fromString, expected);
+            }
+            else {
+                EXPECT_NE(fromString, expected);
+            }
+        };
+    eq(true, "A (*.a)", "A", {"*.a"});
+    eq(true, "A (*.a *.b)", "A", {"*.a", "*.b"});
+    eq(true, "A ( *.a  *.b )", "A", {"*.a", "*.b"});
+    eq(false, "A (*.a;*.b)", "A", {"*.a", "*.b"});
+    eq(true, "L (*.averylongname)", "L", {"*.averylongname"});
 }
 
 TEST(FileDialog, testFilterWildcard)

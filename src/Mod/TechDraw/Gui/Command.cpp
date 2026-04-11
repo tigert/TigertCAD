@@ -179,7 +179,7 @@ void CmdTechDrawPageTemplate::activated(int iMsg)
     QString templateDir = Preferences::defaultTemplateDir();
     QString templateFileName = Gui::FileDialog::getOpenFileName(
         Gui::getMainWindow(), QString::fromUtf8(QT_TR_NOOP("Select a template file")), templateDir,
-        QStringList(QString::fromUtf8(QT_TR_NOOP("Template (*.svg)"))));
+        Gui::FileDialog::FilterList{{QString::fromUtf8(QT_TR_NOOP("Template")), {"*.svg"}}});
     Gui::FileDialog::setWorkingDirectory(work_dir);// Don't overwrite WD with templateDir
 
     if (templateFileName.isEmpty()) {
@@ -440,9 +440,10 @@ void CmdTechDrawView::activated(int iMsg)
                 }
             }
 
-            QStringList filterList;
-            filterList << QStringLiteral("%1 (*.svg *.svgz *.jpg *.jpeg *.png *.bmp)").arg(QObject::tr("SVG or Image files"));
-            filterList << QStringLiteral("%1 (*.*)").arg(QObject::tr("All Files"));
+            const Gui::FileDialog::FilterList filterList {
+                {QObject::tr("SVG or Image files"), {"*.svg", "*.svgz", "*.jpg", "*.jpeg", "*.png", "*.bmp"}},
+                {QObject::tr("All Files"), {"*.*"}},
+            };
             QString filename = Gui::FileDialog::getOpenFileName(Gui::getMainWindow(),
                 QObject::tr("Select a SVG or Image file to open"),
                 Preferences::defaultSymbolDir(),
@@ -1549,9 +1550,10 @@ void CmdTechDrawSymbol::activated(int iMsg)
     std::string PageName = page->getNameInDocument();
 
     // Reading an image
-    QStringList filterList;
-    filterList << QStringLiteral("%1 (*.svg *.svgz)").arg(QObject::tr("Scalable vector graphic"));
-    filterList << QStringLiteral("%1 (*.*)").arg(QObject::tr("All files"));
+    const Gui::FileDialog::FilterList filterList {
+        {QObject::tr("Scalable vector graphic"), {"*.svg", "*.svgz"}},
+        {QObject::tr("All files"), {"*.*"}}
+    };
     QString filename = Gui::FileDialog::getOpenFileName(
         Gui::getMainWindow(), QObject::tr("Choose an SVG file to open"),
         Preferences::defaultSymbolDir(),
@@ -1887,7 +1889,7 @@ void CmdTechDrawExportPageDXF::activated(int iMsg)
     QString defaultDir;
     QString fileName = Gui::FileDialog::getSaveFileName(
         Gui::getMainWindow(), QString::fromUtf8(QT_TR_NOOP("Save DXF file")), defaultDir,
-        QStringList(QStringLiteral("DXF (*.dxf)")));
+        Gui::FileDialog::FilterList{{"DXF", {"*.dxf"}}});
 
     if (fileName.isEmpty()) {
         return;
