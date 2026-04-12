@@ -25,6 +25,7 @@
 #include <QMessageBox>
 #include <QPainter>
 #include <QPixmap>
+#include <QStyledItemDelegate>
 
 
 #include <App/Application.h>
@@ -323,12 +324,16 @@ SketcherSettingsGrid::SketcherSettingsGrid(QWidget* parent)
 
     QList<int> styles = getPenStyles();
 
-    ui->gridLinePattern->setIconSize(QSize(80, 12));
-    ui->gridDivLinePattern->setIconSize(QSize(80, 12));
+    const QSize lineIconSize(80, 12);
+    const auto lineStyleDelegate = new QStyledItemDelegate(this);
+    ui->gridLinePattern->setIconSize(lineIconSize);
+    ui->gridLinePattern->setItemDelegate(lineStyleDelegate);
+    ui->gridDivLinePattern->setIconSize(lineIconSize);
+    ui->gridDivLinePattern->setItemDelegate(lineStyleDelegate);
+    const QBrush brush(palette().color(QPalette::WindowText));
     for (auto& style : styles) {
-        QPixmap px(ui->gridLinePattern->iconSize());
+        QPixmap px(lineIconSize);
         px.fill(Qt::transparent);
-        QBrush brush(Qt::black);
 
         QPen pen;
         pen.setDashPattern(binaryPatternToDashPattern(style));
@@ -337,12 +342,13 @@ SketcherSettingsGrid::SketcherSettingsGrid(QWidget* parent)
 
         QPainter painter(&px);
         painter.setPen(pen);
-        double mid = ui->gridLinePattern->iconSize().height() / 2.0;
-        painter.drawLine(0, mid, ui->gridLinePattern->iconSize().width(), mid);
+        double mid = lineIconSize.height() / 2.0;
+        painter.drawLine(0, mid, lineIconSize.width(), mid);
         painter.end();
 
-        ui->gridLinePattern->addItem(QIcon(px), QString(), QVariant(style));
-        ui->gridDivLinePattern->addItem(QIcon(px), QString(), QVariant(style));
+        QIcon icon(px);
+        ui->gridLinePattern->addItem(icon, QString(), QVariant(style));
+        ui->gridDivLinePattern->addItem(icon, QString(), QVariant(style));
     }
 }
 
@@ -542,15 +548,22 @@ SketcherSettingsAppearance::SketcherSettingsAppearance(QWidget* parent)
 
     QList<int> styles = getPenStyles();
 
-    ui->EdgePattern->setIconSize(QSize(70, 12));
-    ui->ConstructionPattern->setIconSize(QSize(70, 12));
-    ui->InternalPattern->setIconSize(QSize(70, 12));
-    ui->ExternalPattern->setIconSize(QSize(70, 12));
-    ui->ExternalDefiningPattern->setIconSize(QSize(70, 12));
+    const QSize lineIconSize(70, 12);
+    const auto lineStyleDelegate = new QStyledItemDelegate(this);
+    ui->EdgePattern->setIconSize(lineIconSize);
+    ui->EdgePattern->setItemDelegate(lineStyleDelegate);
+    ui->ConstructionPattern->setIconSize(lineIconSize);
+    ui->ConstructionPattern->setItemDelegate(lineStyleDelegate);
+    ui->InternalPattern->setIconSize(lineIconSize);
+    ui->InternalPattern->setItemDelegate(lineStyleDelegate);
+    ui->ExternalPattern->setIconSize(lineIconSize);
+    ui->ExternalPattern->setItemDelegate(lineStyleDelegate);
+    ui->ExternalDefiningPattern->setIconSize(lineIconSize);
+    ui->ExternalDefiningPattern->setItemDelegate(lineStyleDelegate);
+    const QBrush brush(palette().color(QPalette::WindowText));
     for (auto& style : styles) {
-        QPixmap px(ui->EdgePattern->iconSize());
+        QPixmap px(lineIconSize);
         px.fill(Qt::transparent);
-        QBrush brush(Qt::black);
         QPen pen;
         pen.setDashPattern(binaryPatternToDashPattern(style));
         pen.setBrush(brush);
@@ -558,15 +571,16 @@ SketcherSettingsAppearance::SketcherSettingsAppearance(QWidget* parent)
 
         QPainter painter(&px);
         painter.setPen(pen);
-        double mid = ui->EdgePattern->iconSize().height() / 2.0;
-        painter.drawLine(0, mid, ui->EdgePattern->iconSize().width(), mid);
+        double mid = lineIconSize.height() / 2.0;
+        painter.drawLine(0, mid, lineIconSize.width(), mid);
         painter.end();
 
-        ui->EdgePattern->addItem(QIcon(px), QString(), QVariant(style));
-        ui->ConstructionPattern->addItem(QIcon(px), QString(), QVariant(style));
-        ui->InternalPattern->addItem(QIcon(px), QString(), QVariant(style));
-        ui->ExternalPattern->addItem(QIcon(px), QString(), QVariant(style));
-        ui->ExternalDefiningPattern->addItem(QIcon(px), QString(), QVariant(style));
+        QIcon icon(px);
+        ui->EdgePattern->addItem(icon, QString(), QVariant(style));
+        ui->ConstructionPattern->addItem(icon, QString(), QVariant(style));
+        ui->InternalPattern->addItem(icon, QString(), QVariant(style));
+        ui->ExternalPattern->addItem(icon, QString(), QVariant(style));
+        ui->ExternalDefiningPattern->addItem(icon, QString(), QVariant(style));
     }
 }
 
