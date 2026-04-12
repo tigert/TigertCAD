@@ -315,7 +315,6 @@ QString FileDialogInternal::getFilterDisplayName(const FileDialog::Filter& filte
     }
 
     QString formatted(filter.name);
-    formatted += QLatin1Char(' ');
 
     // Deduplicate the patterns which usually come in both uppercase and lowercase variants.
     // Keeps the first case encountered for a given pattern set.
@@ -343,7 +342,7 @@ QString FileDialogInternal::getFilterDisplayName(const FileDialog::Filter& filte
     }
 
     if (dedupPatterns.size() <= MaxFiltersLength) {
-        formatted += QLatin1Char('(');
+        formatted += QStringLiteral(" (");
         formatted += dedupPatterns;
         formatted += QLatin1Char(')');
     }
@@ -417,6 +416,13 @@ QStringList FileDialogInternal::nativeFileDialog(
         );
     }
     selectedFilterIndex = qtFilterList.indexOf(selectedQtFilter);
+    if (selectedFilterIndex < 0) {
+        Base::Console().error(
+            "Qt-backed nativeFileDialog returned a selected filter that wasn't in the original "
+            "list, defaulting to index 0"
+        );
+        selectedFilterIndex = 0;
+    }
     return selected;
 }
 #endif
@@ -577,6 +583,12 @@ QString FileDialog::getSaveFileName(
         // https://github.com/qt/qtbase/blob/53ff8897c5c8bc6175cf94ed24e2d2c5fa17365b/
         // src/widgets/dialogs/qfiledialog.cpp#L1484
         actuallySelectedFilterIndex = qtFilterList.indexOf(dlg.selectedNameFilter());
+        if (actuallySelectedFilterIndex < 0) {
+            // Log an error since this happening means the code is incorrect
+            Base::Console()
+                .error("FileDialog returned a selected filter that wasn't in the original list, defaulting to index 0");
+            actuallySelectedFilterIndex = 0;
+        }
     }
     else {
         const auto files = nativeFileDialog(
@@ -699,6 +711,12 @@ QString FileDialog::getOpenFileName(
         // Non-native QFileDialog::selectedNameFilter() always returns a filter, even if
         // the user cancelled or the dialog wasn't shown at all.
         actuallySelectedFilterIndex = qtFilterList.indexOf(dlg.selectedNameFilter());
+        if (actuallySelectedFilterIndex < 0) {
+            // Log an error since this happening means the code is incorrect
+            Base::Console()
+                .error("FileDialog returned a selected filter that wasn't in the original list, defaulting to index 0");
+            actuallySelectedFilterIndex = 0;
+        }
     }
     else {
         const auto files = nativeFileDialog(
@@ -785,6 +803,12 @@ QStringList FileDialog::getOpenFileNames(
         // Non-native QFileDialog::selectedNameFilter() always returns a filter, even if
         // the user cancelled or the dialog wasn't shown at all.
         actuallySelectedFilterIndex = qtFilterList.indexOf(dlg.selectedNameFilter());
+        if (actuallySelectedFilterIndex < 0) {
+            // Log an error since this happening means the code is incorrect
+            Base::Console()
+                .error("FileDialog returned a selected filter that wasn't in the original list, defaulting to index 0");
+            actuallySelectedFilterIndex = 0;
+        }
     }
     else {
         files = nativeFileDialog(
