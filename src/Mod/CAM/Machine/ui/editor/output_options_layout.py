@@ -75,6 +75,7 @@ def build_output_options(machine, layout, context="CAM_MachineEditor"):
         if idx >= 0:
             units_combo.setCurrentIndex(idx)
     except Exception:
+        # units_val might not be a valid enum value, just skip
         pass
     main_layout.addRow(translate(context, "Units"), units_combo)
     units_combo.value_getter = lambda: units_combo.itemData(units_combo.currentIndex())
@@ -116,6 +117,7 @@ def build_output_options(machine, layout, context="CAM_MachineEditor"):
                     dc_instance, title
                 )
             except Exception:
+                # dc_instance might not be a valid dataclass, just skip
                 continue
             layout.addWidget(group)
             all_widgets[attr_name] = widgets
@@ -132,6 +134,7 @@ def build_output_options(machine, layout, context="CAM_MachineEditor"):
             layout.addWidget(processing_group)
             all_widgets["processing"] = processing_widgets
         except Exception:
+            # processing might not be a valid dataclass, just skip
             pass
 
     return all_widgets
