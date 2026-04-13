@@ -825,7 +825,7 @@ class PostProcessDialog:
                                 f"        ToolController: {tc.Label} (T{tc.data.get('tool_number', '?')})"
                             )
                         else:
-                            lines.append(f"        ToolController: None")
+                            lines.append("        ToolController: None")
                         # Cycle time from postable operation data
                         src = getattr(obj, "source", None)
                         if src is not None:
