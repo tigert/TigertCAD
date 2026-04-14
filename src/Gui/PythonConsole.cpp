@@ -1429,7 +1429,7 @@ void PythonConsole::onInsertFileName()
         Gui::getMainWindow(),
         tr("Insert file name"),
         QString(),
-        FileDialog::FilterList {{tr("All Files"), {"*.*"}}}
+        FileDialog::FilterList {FileDialog::Filter::AllFiles()}
     );
     if (!fn.isEmpty()) {
         insertPlainText(fn);

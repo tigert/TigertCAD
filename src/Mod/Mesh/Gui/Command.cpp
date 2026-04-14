@@ -363,8 +363,8 @@ void CmdMeshImport::activated(int)
         {QObject::tr("Object File Format"), {"*.off"}},
         {QObject::tr("Inventor V2.1 ASCII"), {"*.iv"}},
         {QObject::tr("Stanford Polygon"), {"*.ply"}},
-        {QObject::tr("NASTRAN"), {"*.nas", "*.bdf"}},
-        {QObject::tr("All Files"), {"*.*"}},
+        {QStringLiteral("NASTRAN"), {"*.nas", "*.bdf"}},
+        Gui::FileDialog::Filter::AllFiles(),
     };
 
     // Allow multi selection
@@ -435,11 +435,11 @@ void CmdMeshExport::activated(int)
     ext << qMakePair<Filter, QByteArray>({QObject::tr("Stanford Polygon"), {"*.ply"}}, "PLY");
     ext << qMakePair<Filter, QByteArray>({QObject::tr("VRML V2.0"), {"*.wrl *.vrml"}}, "VRML");
     ext << qMakePair<Filter, QByteArray>({QObject::tr("Compressed VRML 2.0"), {"*.wrz"}}, "WRZ");
-    ext << qMakePair<Filter, QByteArray>({QObject::tr("Nastran"), {"*.nas *.bdf"}}, "NAS");
+    ext << qMakePair<Filter, QByteArray>({QStringLiteral("NASTRAN"), {"*.nas *.bdf"}}, "NAS");
     ext << qMakePair<Filter, QByteArray>({QObject::tr("Python module def"), {"*.py"}}, "PY");
     ext << qMakePair<Filter, QByteArray>({QObject::tr("Asymptote Format"), {"*.asy"}}, "ASY");
     ext << qMakePair<Filter, QByteArray>({QObject::tr("3D Manufacturing Format"), {"*.3mf"}}, "3MF");
-    ext << qMakePair<Filter, QByteArray>({QObject::tr("All Files"), {"*.*"}}, ""); // Undefined
+    ext << qMakePair<Filter, QByteArray>(Filter::AllFiles(), ""); // Undefined
     // clang-format on
     Gui::FileDialog::FilterList filter;
     for (const auto& it : ext) {

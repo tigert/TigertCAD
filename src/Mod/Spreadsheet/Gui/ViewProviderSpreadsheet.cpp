@@ -104,8 +104,8 @@ void ViewProviderSheet::exportAsFile()
 {
     auto* sheet = getObject<Spreadsheet::Sheet>();
     const Gui::FileDialog::FilterList formatList {
-        {QObject::tr("CSV"), {"*.csv", "*.CSV"}},
-        {QObject::tr("All"), {"(*)"}}
+        {QStringLiteral("CSV"), {"*.csv", "*.CSV"}},
+        Gui::FileDialog::Filter::AllFiles(),
     };
     QString fileName = Gui::FileDialog::getSaveFileName(
         Gui::getMainWindow(),

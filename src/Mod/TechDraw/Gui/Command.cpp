@@ -178,8 +178,8 @@ void CmdTechDrawPageTemplate::activated(int iMsg)
     QString work_dir = Gui::FileDialog::getWorkingDirectory();
     QString templateDir = Preferences::defaultTemplateDir();
     QString templateFileName = Gui::FileDialog::getOpenFileName(
-        Gui::getMainWindow(), QString::fromUtf8(QT_TR_NOOP("Select a template file")), templateDir,
-        Gui::FileDialog::FilterList{{QString::fromUtf8(QT_TR_NOOP("Template")), {"*.svg"}}});
+        Gui::getMainWindow(), QObject::tr("Select a template file"), templateDir,
+        Gui::FileDialog::FilterList{{QObject::tr("Template"), {"*.svg"}}});
     Gui::FileDialog::setWorkingDirectory(work_dir);// Don't overwrite WD with templateDir
 
     if (templateFileName.isEmpty()) {
@@ -442,7 +442,7 @@ void CmdTechDrawView::activated(int iMsg)
 
             const Gui::FileDialog::FilterList filterList {
                 {QObject::tr("SVG or Image files"), {"*.svg", "*.svgz", "*.jpg", "*.jpeg", "*.png", "*.bmp"}},
-                {QObject::tr("All Files"), {"*.*"}},
+                Gui::FileDialog::Filter::AllFiles(),
             };
             QString filename = Gui::FileDialog::getOpenFileName(Gui::getMainWindow(),
                 QObject::tr("Select a SVG or Image file to open"),
@@ -1551,8 +1551,8 @@ void CmdTechDrawSymbol::activated(int iMsg)
 
     // Reading an image
     const Gui::FileDialog::FilterList filterList {
-        {QObject::tr("Scalable vector graphic"), {"*.svg", "*.svgz"}},
-        {QObject::tr("All files"), {"*.*"}}
+        {QStringLiteral("SVG"), {"*.svg", "*.svgz"}},
+        Gui::FileDialog::Filter::AllFiles(),
     };
     QString filename = Gui::FileDialog::getOpenFileName(
         Gui::getMainWindow(), QObject::tr("Choose an SVG file to open"),
@@ -1888,8 +1888,8 @@ void CmdTechDrawExportPageDXF::activated(int iMsg)
     //WF? allow more than one TD Page per Dxf file??  1 TD page = 1 DXF file = 1 drawing?
     QString defaultDir;
     QString fileName = Gui::FileDialog::getSaveFileName(
-        Gui::getMainWindow(), QString::fromUtf8(QT_TR_NOOP("Save DXF file")), defaultDir,
-        Gui::FileDialog::FilterList{{"DXF", {"*.dxf"}}});
+        Gui::getMainWindow(), QObject::tr("Save DXF file"), defaultDir,
+        Gui::FileDialog::FilterList{{QStringLiteral("DXF"), {"*.dxf"}}});
 
     if (fileName.isEmpty()) {
         return;

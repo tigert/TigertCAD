@@ -130,7 +130,7 @@ void StdCmdOpen::activated(int iMsg)
         }
     }
 
-    formatList.append({QObject::tr("All files"), {"*.*"}});
+    formatList.append(FileDialog::Filter::AllFiles());
 
     qsizetype selectedFilterIndex = -1;
     QStringList fileList = FileDialog::getOpenFileNames(
@@ -243,7 +243,7 @@ void StdCmdImport::activated(int iMsg)
         }
     }
 
-    formatList.append({QObject::tr("All files"), {"*.*"}});
+    formatList.append(FileDialog::Filter::AllFiles());
 
     Base::Reference<ParameterGrp> hPath = App::GetApplication()
                                               .GetUserParameter()
@@ -616,9 +616,9 @@ void StdCmdMergeProjects::activated(int iMsg)
     QString exe = qApp->applicationName();
     QString project = FileDialog::getOpenFileName(
         Gui::getMainWindow(),
-        QString::fromUtf8(QT_TR_NOOP("Merge Document")),
+        QObject::tr("Merge Document"),
         FileDialog::getWorkingDirectory(),
-        FileDialog::FilterList {{QString::fromUtf8(QT_TR_NOOP("%1 document")).arg(exe), {"*.FCStd"}}}
+        FileDialog::FilterList {{QObject::tr("%1 document").arg(exe), {"*.FCStd"}}}
     );
     if (!project.isEmpty()) {
         FileDialog::setWorkingDirectory(project);
@@ -628,8 +628,8 @@ void StdCmdMergeProjects::activated(int iMsg)
         if (proj == info) {
             QMessageBox::critical(
                 Gui::getMainWindow(),
-                QString::fromUtf8(QT_TR_NOOP("Merge Document")),
-                QString::fromUtf8(QT_TR_NOOP("Cannot merge document with itself."))
+                QObject::tr("Merge Document"),
+                QObject::tr("Cannot merge document with itself.")
             );
             return;
         }
@@ -709,7 +709,7 @@ void StdCmdExportDependencyGraph::activated(int iMsg)
         Gui::getMainWindow(),
         Gui::GraphvizView::tr("Export Graph"),
         QString(),
-        FileDialog::FilterList {{Gui::GraphvizView::tr("Graphviz format"), {"*.gv"}}}
+        FileDialog::FilterList {{QStringLiteral("Graphviz"), {"*.gv"}}}
     );
     if (!fn.isEmpty()) {
         QFile file(fn);

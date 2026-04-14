@@ -89,7 +89,7 @@ void CmdRobotExportKukaCompact::activated(int)
 
     const Gui::FileDialog::FilterList filter {
         {QObject::tr("KRL file"), {"*.src"}},
-        {QObject::tr("All Files"), {"*.*"}}
+        Gui::FileDialog::Filter::AllFiles(),
     };
     QString fn = Gui::FileDialog::getSaveFileName(
         Gui::getMainWindow(),
@@ -171,7 +171,7 @@ void CmdRobotExportKukaFull::activated(int)
 
     const Gui::FileDialog::FilterList filter {
         {QObject::tr("KRL file"), {"*.src"}},
-        {QObject::tr("All Files"), {"*.*"}}
+        Gui::FileDialog::Filter::AllFiles(),
     };
     QString fn = Gui::FileDialog::getSaveFileName(
         Gui::getMainWindow(),

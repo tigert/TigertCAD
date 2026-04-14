@@ -1077,9 +1077,9 @@ void CmdPartImport::activated(int iMsg)
     Q_UNUSED(iMsg);
     const Gui::FileDialog::FilterList filter {
         {QStringLiteral("STEP"), {"*.stp", "*.step"}},
-        {QStringLiteral("STEP with colors"), {"*.stp", "*.step"}},
+        {QObject::tr("STEP with colors"), {"*.stp", "*.step"}},
         {QStringLiteral("IGES"), {"*.igs", "*.iges"}},
-        {QStringLiteral("IGES with colors"), {"*.igs", "*.iges"}},
+        {QObject::tr("IGES with colors"), {"*.igs", "*.iges"}},
         {QStringLiteral("BREP"), {"*.brp", "*.brep"}},
     };
 
@@ -1147,9 +1147,9 @@ void CmdPartExport::activated(int iMsg)
     Q_UNUSED(iMsg);
     const Gui::FileDialog::FilterList filter {
         {QStringLiteral("STEP"), {"*.stp", "*.step"}},
-        {QStringLiteral("STEP with colors"), {"*.stp", "*.step"}},
+        {QObject::tr("STEP with colors"), {"*.stp", "*.step"}},
         {QStringLiteral("IGES"), {"*.igs", "*.iges"}},
-        {QStringLiteral("IGES with colors"), {"*.igs", "*.iges"}},
+        {QObject::tr("IGES with colors"), {"*.igs", "*.iges"}},
         {QStringLiteral("BREP"), {"*.brp", "*.brep"}},
     };
 
@@ -1202,7 +1202,7 @@ void CmdPartImportCurveNet::activated(int iMsg)
         {QStringLiteral("STEP"), {"*.stp", "*.step"}},
         {QStringLiteral("IGES"), {"*.igs", "*.iges"}},
         {QStringLiteral("BREP"), {"*.brp", "*.brep"}},
-        {QObject::tr("All Files"), {"*.*"}},
+        Gui::FileDialog::Filter::AllFiles(),
     };
 
     QString fn = Gui::FileDialog::getOpenFileName(Gui::getMainWindow(), QString(), QString(), filter);

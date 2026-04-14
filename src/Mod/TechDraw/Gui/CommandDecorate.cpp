@@ -356,11 +356,11 @@ void CmdTechDrawImage::activated(int iMsg)
 
     // Reading an image
     const Gui::FileDialog::FilterList filterList {
-        {QString::fromUtf8(QT_TR_NOOP("Image files")), {"*.jpg", "*.jpeg", "*.png", "*.bmp"}},
-        {QString::fromUtf8(QT_TR_NOOP("All files")), {"*"}},
+        {QObject::tr("Image files"), {"*.jpg", "*.jpeg", "*.png", "*.bmp"}},
+        Gui::FileDialog::Filter::AllFiles(),
     };
     QString fileName = Gui::FileDialog::getOpenFileName(Gui::getMainWindow(),
-        QString::fromUtf8(QT_TR_NOOP("Select an image file")),
+        QObject::tr("Select an image file"),
         Preferences::defaultSymbolDir(),
         filterList);
     if (fileName.isEmpty()) {

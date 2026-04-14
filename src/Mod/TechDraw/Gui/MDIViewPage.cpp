@@ -513,7 +513,7 @@ void MDIViewPage::saveSVG()
 {
     const Gui::FileDialog::FilterList filter {
         {QStringLiteral("SVG"), {"*.svg"}},
-        {QObject::tr("All files"), {"*.*"}}
+        Gui::FileDialog::Filter::AllFiles(),
     };
     QString fn =
         Gui::FileDialog::getSaveFileName(Gui::getMainWindow(), QObject::tr("Export page as SVG"),
@@ -536,7 +536,7 @@ void MDIViewPage::saveDXF()
 {
     const Gui::FileDialog::FilterList filter {
         {QStringLiteral("DXF"), {"*.dxf"}},
-        {QObject::tr("All files"), {"*.*"}}
+        Gui::FileDialog::Filter::AllFiles(),
     };
     QString fn =
         Gui::FileDialog::getSaveFileName(Gui::getMainWindow(), QObject::tr("Export page as DXF"),
@@ -592,8 +592,8 @@ void MDIViewPage::exportAsPdf() const
 QString MDIViewPage::getPdfFileName() const
 {
     const Gui::FileDialog::FilterList filter {
-        {QObject::tr("PDF"), {"*.pdf"}},
-        {QObject::tr("All files"), {"*.*"}}
+        {"PDF", {"*.pdf"}},
+        Gui::FileDialog::Filter::AllFiles(),
     };
     QString fn =
         Gui::FileDialog::getSaveFileName(Gui::getMainWindow(),

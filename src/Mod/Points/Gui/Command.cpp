@@ -79,7 +79,7 @@ void CmdPointsImport::activated(int iMsg)
 
     const Gui::FileDialog::FilterList formatList {
         {QObject::tr("Point formats"), {"*.asc", "*.pcd", "*.ply", "*.e57"}},
-        {QObject::tr("All Files"), {"*.*"}},
+        Gui::FileDialog::Filter::AllFiles(),
     };
     QString fn
         = Gui::FileDialog::getOpenFileName(Gui::getMainWindow(), QString(), QString(), formatList);
@@ -166,7 +166,7 @@ void CmdPointsExport::activated(int iMsg)
     for (auto point : points) {
         const Gui::FileDialog::FilterList formatList {
             {QObject::tr("Point formats"), {"*.asc", "*.pcd", "*.ply"}},
-            {QObject::tr("All Files"), {"*.*"}}
+            Gui::FileDialog::Filter::AllFiles(),
         };
         QString fn
             = Gui::FileDialog::getSaveFileName(Gui::getMainWindow(), QString(), QString(), formatList);

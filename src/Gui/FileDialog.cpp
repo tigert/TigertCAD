@@ -274,7 +274,14 @@ bool FileDialogInternal::getPreferShowFilterPatterns()
     return group->GetBool("ShowFilterPatterns", show);
 }
 
-FileDialog::Filter FileDialog::Filter::fromFilterString(const QString& filter)
+using Filter = FileDialog::Filter;
+
+Filter Filter::AllFiles()
+{
+    return {QObject::tr("All Files"), {"*.*"}};
+}
+
+Filter Filter::fromFilterString(const QString& filter)
 {
     const auto start = filter.lastIndexOf(QLatin1Char('('));
     const auto end = filter.lastIndexOf(QLatin1Char(')'));
@@ -285,12 +292,12 @@ FileDialog::Filter FileDialog::Filter::fromFilterString(const QString& filter)
     return {name, patternsPart.split(QLatin1Char(' '), Qt::SkipEmptyParts)};
 }
 
-QString FileDialog::Filter::toFilterString() const
+QString Filter::toFilterString() const
 {
     return name + QStringLiteral(" (") + patterns.join(QLatin1Char(' ')) + QLatin1Char(')');
 }
 
-bool FileDialog::Filter::isWildcard() const
+bool Filter::isWildcard() const
 {
     for (const auto& pat : patterns) {
         if (pat == "*" || pat == "*.*") {
@@ -300,7 +307,7 @@ bool FileDialog::Filter::isWildcard() const
     return false;
 }
 
-QString FileDialogInternal::getFilterDisplayName(const FileDialog::Filter& filter, bool showPatterns)
+QString FileDialogInternal::getFilterDisplayName(const Filter& filter, bool showPatterns)
 {
     // Avoid overflowing the screen with an excessively long filter list (see #23139).
     const qsizetype MaxFiltersLength = 128;
@@ -346,7 +353,7 @@ QString FileDialogInternal::getFilterDisplayName(const FileDialog::Filter& filte
     return formatted;
 }
 
-static QString toQtFilter(const FileDialog::Filter& filter, bool showPatterns)
+static QString toQtFilter(const Filter& filter, bool showPatterns)
 {
     return FileDialogInternal::getFilterDisplayName(filter, showPatterns) + QStringLiteral(" (")
         + filter.patterns.join(QLatin1Char(' ')) + QLatin1Char(')');

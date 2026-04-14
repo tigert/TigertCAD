@@ -1618,7 +1618,7 @@ bool Document::saveAs()
         getMainWindow(),
         QObject::tr("Save %1 Document").arg(exe),
         name,
-        FileDialog::FilterList {{QStringLiteral("%1 %2").arg(exe, QObject::tr("Document")), {"*.FCStd"}}}
+        FileDialog::FilterList {{QObject::tr("%1 document").arg(exe), {"*.FCStd"}}}
     );
 
     if (!fn.isEmpty()) {

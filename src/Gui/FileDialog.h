@@ -66,6 +66,9 @@ public:
      */
     struct GuiExport Filter
     {
+        /** Predefined "All files (*.*)" filter. */
+        static Filter AllFiles();
+
         /** Text displayed for this filter. Translatable. */
         QString name;
 
