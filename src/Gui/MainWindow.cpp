@@ -108,6 +108,7 @@
 #include "StatusBarLabel.h"
 #include "ToolBarManager.h"
 #include "ToolBoxManager.h"
+#include "Utilities.h"
 #include "Tree.h"
 #include "WaitCursor.h"
 #include "WorkbenchManager.h"
@@ -1720,7 +1721,7 @@ void MainWindow::processMessages(const QList<QString>& msg)
 void MainWindow::delayedStartup()
 {
     // automatically run unit tests in Gui
-    if (App::Application::Config()["RunMode"] == "Internal") {
+    if (Gui::isInternalGuiTestRun()) {
         try {
             // Command-line GUI tests should not depend on the interactive QtUnitGui
             // dialog. In headless runs such as QT_QPA_PLATFORM=offscreen/minimal,
