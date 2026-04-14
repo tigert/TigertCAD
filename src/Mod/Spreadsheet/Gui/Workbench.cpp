@@ -143,134 +143,154 @@ void WorkbenchHelper::setForegroundColor(const QColor& color)
 {
     Gui::Document* doc = Gui::Application::Instance->activeDocument();
 
-    if (doc) {
-        Gui::MDIView* activeWindow = Gui::getMainWindow()->activeWindow();
-        SpreadsheetGui::SheetView* sheetView = freecad_cast<SpreadsheetGui::SheetView*>(activeWindow);
-
-        if (sheetView) {
-            Sheet* sheet = sheetView->getSheet();
-            std::vector<Range> ranges = sheetView->selectedRanges();
-
-            if (!ranges.empty()) {
-                std::vector<Range>::const_iterator i = ranges.begin();
-
-                sheet->getDocument()->openTransaction(QT_TRANSLATE_NOOP("Command", "Set text color"));
-                for (; i != ranges.end(); ++i) {
-                    Gui::Command::doCommand(
-                        Gui::Command::Doc,
-                        "App.ActiveDocument.%s.setForeground('%s', (%f,%f,%f))",
-                        sheet->getNameInDocument(),
-                        i->rangeString().c_str(),
-                        color.redF(),
-                        color.greenF(),
-                        color.blueF()
-                    );
-                }
-                sheet->getDocument()->commitTransaction();
-                Gui::Command::doCommand(Gui::Command::Doc, "App.ActiveDocument.recompute()");
-            }
-        }
+    if (!doc) {
+        return;
     }
+
+    Gui::MDIView* activeWindow = Gui::getMainWindow()->activeWindow();
+    SpreadsheetGui::SheetView* sheetView = freecad_cast<SpreadsheetGui::SheetView*>(activeWindow);
+
+    if (!sheetView) {
+        return;
+    }
+
+    Sheet* sheet = sheetView->getSheet();
+    std::vector<Range> ranges = sheetView->selectedRanges();
+
+    if (ranges.empty()) {
+        return;
+    }
+
+    std::vector<Range>::const_iterator i = ranges.begin();
+
+    sheet->getDocument()->openTransaction(QT_TRANSLATE_NOOP("Command", "Set text color"));
+    for (; i != ranges.end(); ++i) {
+        Gui::Command::doCommand(
+            Gui::Command::Doc,
+            "App.ActiveDocument.%s.setForeground('%s', (%f,%f,%f))",
+            sheet->getNameInDocument(),
+            i->rangeString().c_str(),
+            color.redF(),
+            color.greenF(),
+            color.blueF()
+        );
+    }
+    sheet->getDocument()->commitTransaction();
+    Gui::Command::doCommand(Gui::Command::Doc, "App.ActiveDocument.recompute()");
 }
 
 void SpreadsheetGui::WorkbenchHelper::clearForegroundColor()
 {
     Gui::Document* doc = Gui::Application::Instance->activeDocument();
 
-    if (doc) {
-        Gui::MDIView* activeWindow = Gui::getMainWindow()->activeWindow();
-        SpreadsheetGui::SheetView* sheetView = freecad_cast<SpreadsheetGui::SheetView*>(activeWindow);
-
-        if (sheetView) {
-            Sheet* sheet = sheetView->getSheet();
-            std::vector<Range> ranges = sheetView->selectedRanges();
-
-            if (!ranges.empty()) {
-                std::vector<Range>::const_iterator i = ranges.begin();
-
-                sheet->getDocument()->openTransaction(QT_TRANSLATE_NOOP("Command", "Clear text color"));
-                for (; i != ranges.end(); ++i) {
-                    Gui::Command::doCommand(
-                        Gui::Command::Doc,
-                        "App.ActiveDocument.%s.clearForeground('%s')",
-                        sheet->getNameInDocument(),
-                        i->rangeString().c_str()
-                    );
-                }
-                sheet->getDocument()->commitTransaction();
-                Gui::Command::doCommand(Gui::Command::Doc, "App.ActiveDocument.recompute()");
-            }
-        }
+    if (!doc) {
+        return;
     }
+
+    Gui::MDIView* activeWindow = Gui::getMainWindow()->activeWindow();
+    SpreadsheetGui::SheetView* sheetView = freecad_cast<SpreadsheetGui::SheetView*>(activeWindow);
+
+    if (!sheetView) {
+        return;
+    }
+
+    Sheet* sheet = sheetView->getSheet();
+    std::vector<Range> ranges = sheetView->selectedRanges();
+
+    if (ranges.empty()) {
+        return;
+    }
+
+    std::vector<Range>::const_iterator i = ranges.begin();
+
+    sheet->getDocument()->openTransaction(QT_TRANSLATE_NOOP("Command", "Clear text color"));
+    for (; i != ranges.end(); ++i) {
+        Gui::Command::doCommand(
+            Gui::Command::Doc,
+            "App.ActiveDocument.%s.clearForeground('%s')",
+            sheet->getNameInDocument(),
+            i->rangeString().c_str()
+        );
+    }
+    sheet->getDocument()->commitTransaction();
+    Gui::Command::doCommand(Gui::Command::Doc, "App.ActiveDocument.recompute()");
 }
 
 void WorkbenchHelper::setBackgroundColor(const QColor& color)
 {
     Gui::Document* doc = Gui::Application::Instance->activeDocument();
 
-    if (doc) {
-        Gui::MDIView* activeWindow = Gui::getMainWindow()->activeWindow();
-        SpreadsheetGui::SheetView* sheetView = freecad_cast<SpreadsheetGui::SheetView*>(activeWindow);
-
-        if (sheetView) {
-            Sheet* sheet = sheetView->getSheet();
-            std::vector<Range> ranges = sheetView->selectedRanges();
-
-            if (!ranges.empty()) {
-                std::vector<Range>::const_iterator i = ranges.begin();
-
-                sheet->getDocument()->openTransaction(
-                    QT_TRANSLATE_NOOP("Command", "Set background color")
-                );
-                for (; i != ranges.end(); ++i) {
-                    Gui::Command::doCommand(
-                        Gui::Command::Doc,
-                        "App.ActiveDocument.%s.setBackground('%s', (%f,%f,%f))",
-                        sheet->getNameInDocument(),
-                        i->rangeString().c_str(),
-                        color.redF(),
-                        color.greenF(),
-                        color.blueF()
-                    );
-                }
-                sheet->getDocument()->commitTransaction();
-                Gui::Command::doCommand(Gui::Command::Doc, "App.ActiveDocument.recompute()");
-            }
-        }
+    if (!doc) {
+        return;
     }
+
+    Gui::MDIView* activeWindow = Gui::getMainWindow()->activeWindow();
+    SpreadsheetGui::SheetView* sheetView = freecad_cast<SpreadsheetGui::SheetView*>(activeWindow);
+
+    if (!sheetView) {
+        return;
+    }
+
+    Sheet* sheet = sheetView->getSheet();
+    std::vector<Range> ranges = sheetView->selectedRanges();
+
+    if (ranges.empty()) {
+        return;
+    }
+
+    std::vector<Range>::const_iterator i = ranges.begin();
+
+    sheet->getDocument()->openTransaction(QT_TRANSLATE_NOOP("Command", "Set background color"));
+    for (; i != ranges.end(); ++i) {
+        Gui::Command::doCommand(
+            Gui::Command::Doc,
+            "App.ActiveDocument.%s.setBackground('%s', (%f,%f,%f))",
+            sheet->getNameInDocument(),
+            i->rangeString().c_str(),
+            color.redF(),
+            color.greenF(),
+            color.blueF()
+        );
+    }
+    sheet->getDocument()->commitTransaction();
+    Gui::Command::doCommand(Gui::Command::Doc, "App.ActiveDocument.recompute()");
 }
 
 void SpreadsheetGui::WorkbenchHelper::clearBackgroundColor()
 {
     Gui::Document* doc = Gui::Application::Instance->activeDocument();
 
-    if (doc) {
-        Gui::MDIView* activeWindow = Gui::getMainWindow()->activeWindow();
-        SpreadsheetGui::SheetView* sheetView = freecad_cast<SpreadsheetGui::SheetView*>(activeWindow);
-
-        if (sheetView) {
-            Sheet* sheet = sheetView->getSheet();
-            std::vector<Range> ranges = sheetView->selectedRanges();
-
-            if (!ranges.empty()) {
-                std::vector<Range>::const_iterator i = ranges.begin();
-
-                sheet->getDocument()->openTransaction(
-                    QT_TRANSLATE_NOOP("Command", "Clear background color")
-                );
-                for (; i != ranges.end(); ++i) {
-                    Gui::Command::doCommand(
-                        Gui::Command::Doc,
-                        "App.ActiveDocument.%s.clearBackground('%s')",
-                        sheet->getNameInDocument(),
-                        i->rangeString().c_str()
-                    );
-                }
-                sheet->getDocument()->commitTransaction();
-                Gui::Command::doCommand(Gui::Command::Doc, "App.ActiveDocument.recompute()");
-            }
-        }
+    if (!doc) {
+        return;
     }
+
+    Gui::MDIView* activeWindow = Gui::getMainWindow()->activeWindow();
+    SpreadsheetGui::SheetView* sheetView = freecad_cast<SpreadsheetGui::SheetView*>(activeWindow);
+
+    if (!sheetView) {
+        return;
+    }
+
+    Sheet* sheet = sheetView->getSheet();
+    std::vector<Range> ranges = sheetView->selectedRanges();
+
+    if (ranges.empty()) {
+        return;
+    }
+
+    std::vector<Range>::const_iterator i = ranges.begin();
+
+    sheet->getDocument()->openTransaction(QT_TRANSLATE_NOOP("Command", "Clear background color"));
+    for (; i != ranges.end(); ++i) {
+        Gui::Command::doCommand(
+            Gui::Command::Doc,
+            "App.ActiveDocument.%s.clearBackground('%s')",
+            sheet->getNameInDocument(),
+            i->rangeString().c_str()
+        );
+    }
+    sheet->getDocument()->commitTransaction();
+    Gui::Command::doCommand(Gui::Command::Doc, "App.ActiveDocument.recompute()");
 }
 
 Gui::MenuItem* Workbench::setupMenuBar() const
