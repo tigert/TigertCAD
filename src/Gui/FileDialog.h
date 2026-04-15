@@ -79,6 +79,13 @@ public:
          */
         QStringList patterns;
 
+        Filter() = default;
+        ~Filter() = default;
+        Filter(QString name, QStringList patterns)
+            : name(std::move(name))
+            , patterns(std::move(patterns))
+        {}
+
         /**
          * Create a filter from its string form.
          * These take the form of `Filter name (*.ext1 *.ext2)`.
