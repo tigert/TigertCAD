@@ -324,7 +324,8 @@ SketcherSettingsGrid::SketcherSettingsGrid(QWidget* parent)
 
     QList<int> styles = getPenStyles();
 
-    const QSize lineIconSize(80, 12);
+    constexpr QSize lineIconSize(80, 12);
+    const qreal dpr = devicePixelRatioF();
     const auto lineStyleDelegate = new QStyledItemDelegate(this);
     ui->gridLinePattern->setIconSize(lineIconSize);
     ui->gridLinePattern->setItemDelegate(lineStyleDelegate);
@@ -332,7 +333,8 @@ SketcherSettingsGrid::SketcherSettingsGrid(QWidget* parent)
     ui->gridDivLinePattern->setItemDelegate(lineStyleDelegate);
     const QBrush brush(palette().color(QPalette::WindowText));
     for (auto& style : styles) {
-        QPixmap px(lineIconSize);
+        QPixmap px(lineIconSize * dpr);
+        px.setDevicePixelRatio(dpr);
         px.fill(Qt::transparent);
 
         QPen pen;
@@ -548,7 +550,8 @@ SketcherSettingsAppearance::SketcherSettingsAppearance(QWidget* parent)
 
     QList<int> styles = getPenStyles();
 
-    const QSize lineIconSize(70, 12);
+    constexpr QSize lineIconSize(70, 12);
+    const qreal dpr = devicePixelRatioF();
     const auto lineStyleDelegate = new QStyledItemDelegate(this);
     ui->EdgePattern->setIconSize(lineIconSize);
     ui->EdgePattern->setItemDelegate(lineStyleDelegate);
@@ -562,7 +565,8 @@ SketcherSettingsAppearance::SketcherSettingsAppearance(QWidget* parent)
     ui->ExternalDefiningPattern->setItemDelegate(lineStyleDelegate);
     const QBrush brush(palette().color(QPalette::WindowText));
     for (auto& style : styles) {
-        QPixmap px(lineIconSize);
+        QPixmap px(lineIconSize * dpr);
+        px.setDevicePixelRatio(dpr);
         px.fill(Qt::transparent);
         QPen pen;
         pen.setDashPattern(binaryPatternToDashPattern(style));
