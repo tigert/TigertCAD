@@ -369,7 +369,7 @@ class TestPathAdaptive(PathTestBase):
 
         # Execute adaptive profiling
         total_cleared, a2d = self._executeAdaptive(
-            area.AdaptiveOperationType.ProfilingInside, stockPath2d, path2d
+            area.AdaptiveOperationType.ProfilingInside, stockPath2d, path2d, stepOverFactor=0.5
         )
 
         # Verify cleared area is appropriate for profiling between 2-3 tool diameters
@@ -417,7 +417,7 @@ class TestPathAdaptive(PathTestBase):
 
         # Execute adaptive profiling
         total_cleared, a2d = self._executeAdaptive(
-            area.AdaptiveOperationType.ProfilingOutside, stockPath2d, path2d
+            area.AdaptiveOperationType.ProfilingOutside, stockPath2d, path2d, stepOverFactor=0.5
         )
 
         # Calculate expected area range for a profile 2-3 tool diameters wide
