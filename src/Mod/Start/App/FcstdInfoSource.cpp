@@ -23,7 +23,7 @@
 
 #include "FcstdInfoSource.h"
 
-#if __cplusplus >= 202302L
+#ifdef __cpp_lib_spanstream
 # include <spanstream>
 #else
 # include <ostream>
@@ -58,20 +58,14 @@ static QByteArray loadFCStdThumbnail(const App::ProjectFile& proj, const QString
 
                 // Read the thumbnail into a buffer
                 const auto dataSize = proj.sizeOfFile(pathToThumbnail);
-#if __cplusplus >= 202302L
                 QByteArray data(dataSize, Qt::Uninitialized);
+#ifdef __cpp_lib_spanstream
                 std::spanstream dataStream({data.data(), size_t(data.size())});
 #else
-                std::string dataString;
-                dataString.reserve(dataSize);
-                Base::StringOStreambuf dataStreambuf(dataString);
+                Base::BufferStreambuf dataStreambuf({data.data(), size_t(data.size())});
                 std::ostream dataStream(&dataStreambuf);
 #endif
                 proj.readInputFileDirect(pathToThumbnail, dataStream);
-#if __cplusplus < 202302L
-                // Incurs a copy
-                QByteArray data(dataString.data(), qsizetype(dataString.size()));
-#endif
 
                 // Save that buffer to the thumbnail cache
                 const Base::FileInfo thumbnailFileInfo(pathToCachedThumbnail.toStdString());
