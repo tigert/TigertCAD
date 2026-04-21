@@ -893,7 +893,7 @@ void TaskView::setShownTaskInfo(int index)
 {
     int stackedIndex = 0;
     int initIndex = currentIndex();
-    if (index < 0 || index >= taskInfos.size()) {
+    if (index < 0 || static_cast<decltype(taskInfos)::size_type>(index) >= taskInfos.size()) {
         updateWatcher();
         stackedIndex = 0;  // Show task watcher
     }
