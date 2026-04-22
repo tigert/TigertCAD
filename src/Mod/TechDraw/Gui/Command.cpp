@@ -349,6 +349,8 @@ void CmdTechDrawView::activated(int iMsg)
                 SpreadName.c_str());
             doCommand(Doc, "App.activeDocument().%s.addView(App.activeDocument().%s)", PageName.c_str(),
                 FeatName.c_str());
+            doCommand(Doc, "if App.activeDocument().%s.Scale: App.activeDocument().%s.Scale = App.activeDocument().%s.Scale",
+                PageName.c_str(), FeatName.c_str(), PageName.c_str());
             updateActive();
             commitCommand();
             viewCreated = true;
@@ -366,6 +368,8 @@ void CmdTechDrawView::activated(int iMsg)
                 SourceName.c_str());
             doCommand(Doc, "App.activeDocument().%s.addView(App.activeDocument().%s)", PageName.c_str(),
                 FeatName.c_str());
+            doCommand(Doc, "if App.activeDocument().%s.Scale: App.activeDocument().%s.Scale = App.activeDocument().%s.Scale",
+                PageName.c_str(), FeatName.c_str(), PageName.c_str());
             updateActive();
             commitCommand();
             viewCreated = true;
@@ -1646,6 +1650,8 @@ void CmdTechDrawDraftView::activated(int iMsg)
                   SourceName.c_str());
         doCommand(Doc, "App.activeDocument().%s.addView(App.activeDocument().%s)", PageName.c_str(),
                   FeatName.c_str());
+        doCommand(Doc, "if App.activeDocument().%s.Scale: App.activeDocument().%s.Scale = App.activeDocument().%s.Scale",
+                  PageName.c_str(), FeatName.c_str(), PageName.c_str());
         doCommand(Doc, "App.activeDocument().%s.Direction = FreeCAD.Vector(%.12f, %.12f, %.12f)",
                   FeatName.c_str(), dirs.first.x, dirs.first.y, dirs.first.z);
         updateActive();
@@ -1782,6 +1788,8 @@ void CmdTechDrawSpreadsheetView::activated(int iMsg)
 
     doCommand(Doc, "App.activeDocument().%s.addView(App.activeDocument().%s)", PageName.c_str(),
               FeatName.c_str());
+    doCommand(Doc, "if App.activeDocument().%s.Scale: App.activeDocument().%s.Scale = App.activeDocument().%s.Scale",
+        PageName.c_str(), FeatName.c_str(), PageName.c_str());
     updateActive();
     commitCommand();
 }
