@@ -178,8 +178,8 @@ void CmdTechDrawPageTemplate::activated(int iMsg)
     QString work_dir = Gui::FileDialog::getWorkingDirectory();
     QString templateDir = Preferences::defaultTemplateDir();
     QString templateFileName = Gui::FileDialog::getOpenFileName(
-        Gui::getMainWindow(), QString::fromUtf8(QT_TR_NOOP("Select a template file")), templateDir,
-        QStringList(QString::fromUtf8(QT_TR_NOOP("Template (*.svg)"))));
+        Gui::getMainWindow(), QObject::tr("Select a template file"), templateDir,
+        Gui::FileDialog::FilterList{{QObject::tr("Template"), {"*.svg"}}});
     Gui::FileDialog::setWorkingDirectory(work_dir);// Don't overwrite WD with templateDir
 
     if (templateFileName.isEmpty()) {
@@ -440,9 +440,10 @@ void CmdTechDrawView::activated(int iMsg)
                 }
             }
 
-            QStringList filterList;
-            filterList << QStringLiteral("%1 (*.svg *.svgz *.jpg *.jpeg *.png *.bmp)").arg(QObject::tr("SVG or Image files"));
-            filterList << QStringLiteral("%1 (*.*)").arg(QObject::tr("All Files"));
+            const Gui::FileDialog::FilterList filterList {
+                {QObject::tr("SVG or Image files"), {"*.svg", "*.svgz", "*.jpg", "*.jpeg", "*.png", "*.bmp"}},
+                Gui::FileDialog::Filter::AllFiles(),
+            };
             QString filename = Gui::FileDialog::getOpenFileName(Gui::getMainWindow(),
                 QObject::tr("Select a SVG or Image file to open"),
                 Preferences::defaultSymbolDir(),
@@ -1549,9 +1550,10 @@ void CmdTechDrawSymbol::activated(int iMsg)
     std::string PageName = page->getNameInDocument();
 
     // Reading an image
-    QStringList filterList;
-    filterList << QStringLiteral("%1 (*.svg *.svgz)").arg(QObject::tr("Scalable vector graphic"));
-    filterList << QStringLiteral("%1 (*.*)").arg(QObject::tr("All files"));
+    const Gui::FileDialog::FilterList filterList {
+        {QStringLiteral("SVG"), {"*.svg", "*.svgz"}},
+        Gui::FileDialog::Filter::AllFiles(),
+    };
     QString filename = Gui::FileDialog::getOpenFileName(
         Gui::getMainWindow(), QObject::tr("Choose an SVG file to open"),
         Preferences::defaultSymbolDir(),
@@ -1886,8 +1888,8 @@ void CmdTechDrawExportPageDXF::activated(int iMsg)
     //WF? allow more than one TD Page per Dxf file??  1 TD page = 1 DXF file = 1 drawing?
     QString defaultDir;
     QString fileName = Gui::FileDialog::getSaveFileName(
-        Gui::getMainWindow(), QString::fromUtf8(QT_TR_NOOP("Save DXF file")), defaultDir,
-        QStringList(QStringLiteral("DXF (*.dxf)")));
+        Gui::getMainWindow(), QObject::tr("Save DXF file"), defaultDir,
+        Gui::FileDialog::FilterList{{QStringLiteral("DXF"), {"*.dxf"}}});
 
     if (fileName.isEmpty()) {
         return;

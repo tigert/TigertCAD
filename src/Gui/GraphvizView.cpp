@@ -477,49 +477,50 @@ QByteArray GraphvizView::exportGraph(const QString& format)
 bool GraphvizView::onMsg(const char* pMsg)
 {
     if (strcmp("Save", pMsg) == 0 || strcmp("SaveAs", pMsg) == 0) {
-        QList<QPair<QString, QString>> formatMap;
+        QList<QPair<FileDialog::Filter, QString>> formatMap;
         formatMap << qMakePair(
-            QStringLiteral("%1 (*.gv)").arg(tr("Graphviz format")),
+            FileDialog::Filter {QStringLiteral("Graphviz"), {"*.gv"}},
             QStringLiteral("gv")
         );
-        formatMap
-            << qMakePair(QStringLiteral("%1 (*.png)").arg(tr("PNG format")), QStringLiteral("png"));
         formatMap << qMakePair(
-            QStringLiteral("%1 (*.bmp)").arg(tr("Bitmap format")),
-            QStringLiteral("bmp")
+            FileDialog::Filter {QStringLiteral("PNG"), {"*.png"}},
+            QStringLiteral("png")
         );
-        formatMap
-            << qMakePair(QStringLiteral("%1 (*.gif)").arg(tr("GIF format")), QStringLiteral("gif"));
-        formatMap
-            << qMakePair(QStringLiteral("%1 (*.jpg)").arg(tr("JPG format")), QStringLiteral("jpg"));
-        formatMap
-            << qMakePair(QStringLiteral("%1 (*.svg)").arg(tr("SVG format")), QStringLiteral("svg"));
-        formatMap
-            << qMakePair(QStringLiteral("%1 (*.pdf)").arg(tr("PDF format")), QStringLiteral("pdf"));
+        formatMap << qMakePair(FileDialog::Filter {tr("Bitmap"), {"*.bmp"}}, QStringLiteral("bmp"));
+        formatMap << qMakePair(
+            FileDialog::Filter {QStringLiteral("GIF"), {"*.gif"}},
+            QStringLiteral("gif")
+        );
+        formatMap << qMakePair(
+            FileDialog::Filter {QStringLiteral("JPG"), {"*.jpg"}},
+            QStringLiteral("jpg")
+        );
+        formatMap << qMakePair(
+            FileDialog::Filter {QStringLiteral("SVG"), {"*.svg"}},
+            QStringLiteral("svg")
+        );
+        formatMap << qMakePair(
+            FileDialog::Filter {QStringLiteral("PDF"), {"*.pdf"}},
+            QStringLiteral("pdf")
+        );
 
-        QStringList filter;
+        FileDialog::FilterList filterList;
         for (const auto& it : std::as_const(formatMap)) {
-            filter << it.first;
+            filterList.append(it.first);
         }
 
-        QString selectedFilter;
+        qsizetype selectedFilterIndex = -1;
         QString fn = Gui::FileDialog::getSaveFileName(
             this,
             tr("Export Graph"),
             QString(),
-            filter,
-            &selectedFilter
+            filterList,
+            &selectedFilterIndex
         );
         if (!fn.isEmpty()) {
-            QString format;
-            for (const auto& it : std::as_const(formatMap)) {
-                if (selectedFilter == it.first) {
-                    format = it.second;
-                    break;
-                }
-            }
+            const auto& format = formatMap[selectedFilterIndex].second;
             QByteArray buffer;
-            if (format == QLatin1String("gv")) {
+            if (format == QStringLiteral("gv")) {
                 std::stringstream str;
                 doc.exportGraphviz(str);
                 buffer = QByteArray::fromStdString(str.str());
@@ -601,14 +602,14 @@ void GraphvizView::print()
 
 void GraphvizView::printPdf()
 {
-    QStringList filter;
-    filter << QStringLiteral("%1 (*.pdf)").arg(tr("PDF format"));
-
-    QString selectedFilter;
-    QString fn
-        = Gui::FileDialog::getSaveFileName(this, tr("Export graph"), QString(), filter, &selectedFilter);
+    QString fn = Gui::FileDialog::getSaveFileName(
+        this,
+        tr("Export graph"),
+        QString(),
+        FileDialog::FilterList {{QStringLiteral("PDF"), {"*.pdf"}}}
+    );
     if (!fn.isEmpty()) {
-        QByteArray buffer = exportGraph(selectedFilter);
+        QByteArray buffer = exportGraph("pdf");
         if (buffer.isEmpty()) {
             return;
         }
