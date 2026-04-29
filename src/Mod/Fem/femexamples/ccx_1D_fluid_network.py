@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 # ***************************************************************************
-# *   Copyright (c) 2026 Jakub Michalski <jakub.j.michalski[at]gmail.com>         *
+# *   Copyright (c) 2026 Jakub Michalski <jakub.j.michalski[at]gmail.com>   *
 # *                                                                         *
 # *   This file is part of FreeCAD.                                         *
 # *                                                                         *
