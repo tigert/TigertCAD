@@ -435,10 +435,7 @@ MainWindow::MainWindow(QWidget* parent, Qt::WindowFlags f)
     toggleBottomPanelsButton->setObjectName(QStringLiteral("toggleBottomPanelsButton"));
     //: A context menu action used to show or hide the Toggle Bottom Panels button in the status bar
     toggleBottomPanelsButton->setWindowTitle(tr("Bottom Panel Toggle"));
-    int iconSize = App::GetApplication()
-                       .GetParameterGroupByPath("User parameter:BaseApp/Preferences/General")
-                       ->GetInt("ToolbarIconSize", 24);
-    toggleBottomPanelsButton->setIconSize(QSize(iconSize, iconSize));
+    toggleBottomPanelsButton->setIconSize(QSize(16, 16));
     toggleBottomPanelsButton->setIcon(BitmapFactory().pixmap("Std_ToggleBottomPanels"));
     toggleBottomPanelsButton->setCheckable(true);
     // Starts checked because FreeCAD shows bottom panels by default on first launch. On subsequent
